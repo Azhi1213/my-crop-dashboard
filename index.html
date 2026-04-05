@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- ── SEO & Description ── -->
+    <title>CamPrice — Crop Price Forecast Dashboard</title>
+    <meta name="description" content="AI-Powered Price Predictions for Corn and Palay in Bicol Region (Region 5). SARIMA time series forecasts for 2026–2028." />
+    <meta name="keywords" content="crop price, Bicol, corn, palay, price forecast, agriculture, Philippines, Region 5" />
+    <meta name="author" content="CamPrice Dashboard" />
+
+    <!-- ── PWA Manifest ── -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- ── Theme Colors ── -->
+    <meta name="theme-color" content="#16a34a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="CamPrice" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- ── Performance: Preconnect to external resources ── -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- ── Favicon (inline SVG — no extra request needed) ── -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='16' fill='%2316a34a'/><text y='.9em' font-size='75' x='12'>🌾</text></svg>" />
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='16' fill='%2316a34a'/><text y='.9em' font-size='75' x='12'>🌾</text></svg>" />
+
+    <!-- ── Open Graph (for sharing on social media) ── -->
+    <meta property="og:title" content="CamPrice — Crop Price Forecast Dashboard" />
+    <meta property="og:description" content="AI-Powered Price Predictions for Corn and Palay · Bicol Region (Region 5)" />
+    <meta property="og:type" content="website" />
+
+    <!-- ── Inline critical CSS to prevent flash ── -->
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { height: 100%; }
+      body {
+        background: #f0fdf4;
+        font-family: 'Georgia', 'Times New Roman', serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      #root { height: 100%; }
+      /* Prevent flash of unstyled content */
+      #app-loader {
+        position: fixed; inset: 0;
+        background: linear-gradient(135deg, #052e16, #14532d);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 9999; transition: opacity 0.3s ease;
+      }
+      #app-loader.hidden { opacity: 0; pointer-events: none; }
+      #app-loader-inner { text-align: center; color: #4ade80; font-family: Georgia, serif; }
+      #app-loader-emoji { font-size: 48px; margin-bottom: 12px; animation: spin 2s linear infinite; }
+      #app-loader-text { font-size: 13px; letter-spacing: 3px; text-transform: uppercase; opacity: 0.8; }
+      @keyframes spin { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+    </style>
+  </head>
+  <body>
+    <!-- Instant loader shown before React mounts -->
+    <div id="app-loader">
+      <div id="app-loader-inner">
+        <div id="app-loader-emoji">🌾</div>
+        <div id="app-loader-text">CamPrice · Loading…</div>
+      </div>
+    </div>
+
+    <div id="root"></div>
+
+    <!-- ── Register Service Worker ── -->
+    <script>
+      // Hide the native loader once React takes over
+      window.__hideLoader = function() {
+        const loader = document.getElementById('app-loader');
+        if (loader) {
+          loader.classList.add('hidden');
+          setTimeout(() => loader.remove(), 400);
+        }
+      };
+
+      // Register service worker for offline caching
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/sw.js')
+            .then(function(reg) {
+              console.log('✅ CamPrice: Service Worker registered', reg.scope);
+            })
+            .catch(function(err) {
+              console.log('Service Worker registration failed:', err);
+            });
+        });
+      }
+    </script>
+
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
