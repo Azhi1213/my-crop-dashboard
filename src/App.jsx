@@ -64,10 +64,10 @@ const STYLES = `
 // DATA
 // ─────────────────────────────────────────────────────────────────────────────
 const MARKET = [
-  {label:"White Corn", icon:"🌽",cat:"Corn",  low:28.00,high:31.50,unit:"farmgate"},
-  {label:"Yellow Corn",icon:"🌽",cat:"Corn",  low:26.50,high:30.00,unit:"farmgate"},
-  {label:"Palay Fancy",icon:"🌾",cat:"Palay", low:26.00,high:30.00,unit:"dry"},
-  {label:"Palay Other",icon:"🌾",cat:"Palay", low:18.50,high:25.00,unit:"fresh/wet"},
+  {label:"White Corn", icon:"🌽",cat:"Corn",  low:15.00,high:16.00,unit:"farmgate"},
+  {label:"Yellow Corn",icon:"🌽",cat:"Corn",  low:10.00,high:15.00,unit:"farmgate"},
+  {label:"Palay Fancy",icon:"🌾",cat:"Palay", low:20.00,high:24.00,unit:"dry"},
+  {label:"Palay Other",icon:"🌾",cat:"Palay", low:17.07,high:23.52,unit:"fresh/wet"},
 ];
 
 const CROPS = {
@@ -443,7 +443,7 @@ function HomePage({latestData,priceData}){
       </div>
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm lift aFadeUp d5">
         <h3 className="font-bold text-gray-700 text-sm mb-2 flex items-center gap-2">📊 About This Dashboard</h3>
-        <p className="text-xs text-gray-500 leading-relaxed">AI-generated price forecasts for key agricultural commodities in <strong>Camarines Sur</strong>. Derived from SARIMA time series analysis of DA-5 historical data 2005–2025. Use <strong>Prices</strong> for monthly charts, <strong>Weather</strong> for climate impact, <strong>Insights</strong> for AI explanations, <strong>Pest</strong> for disease detection, and <strong>More</strong> for location suggestions, notifications, and history.</p>
+        <p className="text-xs text-gray-500 leading-relaxed">AI-generated price forecasts for key agricultural commodities in <strong>Camarines Sur</strong>. Derived from SARIMA time series analysis of DA-5 historical data 2010–2025. Use <strong>Prices</strong> for monthly charts, <strong>Weather</strong> for climate impact, <strong>Insights</strong> for AI explanations, <strong>Pest</strong> for disease detection, and <strong>More</strong> for location suggestions, notifications, and history.</p>
       </div>
     </div>
   );
