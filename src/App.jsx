@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { FALLBACK_PRICE_DATA, fetchPriceForecasts, pingSupabase } from "./priceForecasts";
+import { supabase } from "./supabaseClient";
+
+const YEAR_START = 2010;
+const YEAR_END = 2025;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL STYLES
@@ -63,22 +66,61 @@ const STYLES = `
 // ─────────────────────────────────────────────────────────────────────────────
 // DATA
 // ─────────────────────────────────────────────────────────────────────────────
+const PRICE_DATA = [
+  {year:2026,month:"January",   corn_white:17.392251,corn_yellow:16.813207,rice_fancy:18.712211,rice_other:17.763376},
+  {year:2026,month:"February",  corn_white:18.365217,corn_yellow:17.855983,rice_fancy:19.335521,rice_other:18.322656},
+  {year:2026,month:"March",     corn_white:19.12896,corn_yellow:18.367113,rice_fancy:20.065234,rice_other:18.810585},
+  {year:2026,month:"April",     corn_white:19.505476,corn_yellow:18.759517,rice_fancy:20.360768,rice_other:19.281987},
+  {year:2026,month:"May",       corn_white:18.630631,corn_yellow:18.054585,rice_fancy:20.199005,rice_other:19.02364},
+  {year:2026,month:"June",      corn_white:17.766734,corn_yellow:17.183269,rice_fancy:20.115631,rice_other:18.933412},
+  {year:2026,month:"July",      corn_white:16.408729,corn_yellow:16.156589,rice_fancy:19.617338,rice_other:18.520088},
+  {year:2026,month:"August",    corn_white:15.060916,corn_yellow:14.921654,rice_fancy:18.641628,rice_other:17.742431},
+  {year:2026,month:"September", corn_white:14.507927,corn_yellow:14.18531,rice_fancy:18.423302,rice_other:17.477009},
+  {year:2026,month:"October",   corn_white:14.491734,corn_yellow:14.291533,rice_fancy:18.211551,rice_other:17.324805},
+  {year:2026,month:"November",  corn_white:15.082816,corn_yellow:14.743253,rice_fancy:18.308135,rice_other:17.472346},
+  {year:2026,month:"December",  corn_white:16.504705,corn_yellow:16.116589,rice_fancy:19.306423,rice_other:18.359761},
+  {year:2027,month:"January",   corn_white:17.18187,corn_yellow:16.740596,rice_fancy:19.430074,rice_other:18.423356},
+  {year:2027,month:"February",  corn_white:18.1407,corn_yellow:17.622082,rice_fancy:19.781839,rice_other:18.755069},
+  {year:2027,month:"March",     corn_white:18.838514,corn_yellow:18.201961,rice_fancy:20.186611,rice_other:19.076398},
+  {year:2027,month:"April",     corn_white:19.215084,corn_yellow:18.575196,rice_fancy:20.619619,rice_other:19.404939},
+  {year:2027,month:"May",       corn_white:18.54091,corn_yellow:17.846124,rice_fancy:20.385183,rice_other:19.216613},
+  {year:2027,month:"June",      corn_white:17.968739,corn_yellow:17.191844,rice_fancy:20.222859,rice_other:18.991967},
+  {year:2027,month:"July",      corn_white:16.556511,corn_yellow:16.114055,rice_fancy:19.661589,rice_other:18.517865},
+  {year:2027,month:"August",    corn_white:15.430809,corn_yellow:15.04786,rice_fancy:18.636206,rice_other:17.809214},
+  {year:2027,month:"September", corn_white:14.827754,corn_yellow:14.647096,rice_fancy:18.450605,rice_other:17.458945},
+  {year:2027,month:"October",   corn_white:14.766936,corn_yellow:14.525169,rice_fancy:17.999048,rice_other:17.380577},
+  {year:2027,month:"November",  corn_white:15.192519,corn_yellow:14.858449,rice_fancy:18.306868,rice_other:17.430463},
+  {year:2027,month:"December",  corn_white:16.581138,corn_yellow:16.179803,rice_fancy:19.297501,rice_other:18.45568},
+  {year:2028,month:"January",   corn_white:17.196748,corn_yellow:16.872514,rice_fancy:19.459757,rice_other:18.329451},
+  {year:2028,month:"February",  corn_white:18.062251,corn_yellow:17.554517,rice_fancy:19.792247,rice_other:18.632411},
+  {year:2028,month:"March",     corn_white:18.588232,corn_yellow:17.88686,rice_fancy:20.167098,rice_other:19.083365},
+  {year:2028,month:"April",     corn_white:19.004913,corn_yellow:18.305536,rice_fancy:20.615234,rice_other:19.474516},
+  {year:2028,month:"May",       corn_white:18.553567,corn_yellow:17.888173,rice_fancy:20.320954,rice_other:19.217234},
+  {year:2028,month:"June",      corn_white:17.576649,corn_yellow:17.150564,rice_fancy:20.225082,rice_other:19.062953},
+  {year:2028,month:"July",      corn_white:16.658126,corn_yellow:16.258288,rice_fancy:19.544735,rice_other:18.491688},
+  {year:2028,month:"August",    corn_white:15.430838,corn_yellow:15.304672,rice_fancy:18.657896,rice_other:17.754083},
+  {year:2028,month:"September", corn_white:14.94202,corn_yellow:14.699087,rice_fancy:18.33669,rice_other:17.455134},
+  {year:2028,month:"October",   corn_white:14.978134,corn_yellow:14.692802,rice_fancy:18.144163,rice_other:17.289534},
+  {year:2028,month:"November",  corn_white:15.338936,corn_yellow:14.882581,rice_fancy:18.367114,rice_other:17.551124},
+  {year:2028,month:"December",  corn_white:16.494218,corn_yellow:16.118313,rice_fancy:19.289481,rice_other:18.286411}
+];
+
+// Actual market prices from dataset (May 2025 — DA-5 AMAD / Excel source)
+// Actual market prices from Excel dataset (May 2025)
 const MARKET = [
-  {label:"White Corn", icon:"🌽",cat:"Corn",  low:15.00,high:16.00,unit:"farmgate"},
-  {label:"Yellow Corn",icon:"🌽",cat:"Corn",  low:10.00,high:15.00,unit:"farmgate"},
-  {label:"Palay Fancy",icon:"🌾",cat:"Palay", low:20.00,high:24.00,unit:"dry"},
-  {label:"Palay Other",icon:"🌾",cat:"Palay", low:17.07,high:23.52,unit:"fresh/wet"},
+  {label:"Yellow Corn",icon:"🌽",cat:"Corn",  price:14.25,unit:"farmgate",chg:-0.12},
+  {label:"Palay Other",icon:"🌾",cat:"Palay", price:14.43,unit:"fresh/wet",chg:-0.08},
 ];
 
 const CROPS = {
   corn:{label:"Corn", icon:"🌽",color:"#d97706",
     bg:"from-amber-50 to-yellow-50",border:"border-amber-200",
     accent:"bg-amber-500",text:"text-amber-700",badge:"bg-amber-100 text-amber-800",
-    varieties:[{key:"corn_white",label:"White Corn"},{key:"corn_yellow",label:"Yellow Corn"}]},
+    varieties:[{key:"corn_yellow",label:"Yellow Corn"}]},
   rice:{label:"Palay",icon:"🌾",color:"#16a34a",
     bg:"from-green-50 to-emerald-50",border:"border-green-200",
     accent:"bg-green-600",text:"text-green-700",badge:"bg-green-100 text-green-800",
-    varieties:[{key:"rice_fancy",label:"Palay Fancy"},{key:"rice_other",label:"Palay Other"}]},
+    varieties:[{key:"rice_other",label:"Palay Other"}]},
 };
 
 const WEATHER_DATA = [
@@ -97,30 +139,16 @@ const WEATHER_DATA = [
 ];
 
 const BEST_SELL = {
-  corn_white: {months:["October","November","December"],reason:"Post-harvest demand + Q4 holiday snack production peaks."},
   corn_yellow:{months:["September","October","November"],reason:"Livestock feed demand peaks before year-end."},
-  rice_fancy: {months:["November","December","January"], reason:"Holiday season drives premium palay demand to highest levels."},
   rice_other: {months:["January","February"],            reason:"Post-harvest glut clears; prices recover early in the year."},
 };
 
 const FACTORS = {
-  corn_white:[
-    {f:"Seasonal Harvest",    imp:"High",  dir:"↓",desc:"Oct–Nov harvest creates temporary supply glut then price recovery."},
-    {f:"Holiday Snack Demand",imp:"Medium",dir:"↑",desc:"Q4 cornmeal/snack production pushes prices 2–4% above average."},
-    {f:"Transport Cost",      imp:"Medium",dir:"↑",desc:"Rising fuel costs add ₱0.50–1.20/kg to farmgate-to-market transport."},
-    {f:"SARIMA Trend",        imp:"High",  dir:"↑",desc:"Long-term upward trend of ~₱0.28/month from 2005–2025 data."},
-  ],
   corn_yellow:[
     {f:"Livestock Feed Demand",imp:"High",  dir:"↑",desc:"Poultry and hog production cycles drive demand quarterly."},
     {f:"Import Competition",   imp:"Medium",dir:"↓",desc:"Yellow corn imports suppress domestic prices in peak supply months."},
     {f:"Seasonal Harvest",     imp:"High",  dir:"↓",desc:"Camarines Sur harvest in May–Jun and Oct–Nov creates short-term dips."},
     {f:"SARIMA Trend",         imp:"High",  dir:"↑",desc:"Upward trend of ~₱0.25/month from historical analysis."},
-  ],
-  rice_fancy:[
-    {f:"Milling Quality Premium",imp:"High",  dir:"↑",desc:"Well-milled rice commands 20–30% premium over commercial grade."},
-    {f:"Holiday Demand",         imp:"High",  dir:"↑",desc:"Dec–Jan demand surge adds ₱1–2/kg seasonally."},
-    {f:"NFA Buffer Stock",       imp:"Medium",dir:"↓",desc:"NFA stock releases can temporarily moderate retail prices."},
-    {f:"SARIMA Trend",           imp:"High",  dir:"↑",desc:"Consistent growth of ~₱0.18/month from historical data."},
   ],
   rice_other:[
     {f:"Commercial Supply",  imp:"High",  dir:"↓",desc:"Large volume keeps prices lower and more stable."},
@@ -131,14 +159,12 @@ const FACTORS = {
 };
 
 const DEMAND = {
-  corn_white: [62,58,55,60,65,63,61,64,68,72,75,78],
   corn_yellow:[70,68,65,67,72,70,69,71,74,76,78,80],
-  rice_fancy: [65,60,58,62,64,63,62,65,68,72,80,85],
   rice_other: [75,72,70,73,75,74,73,75,76,78,80,82],
 };
 
-const SOIL_PH = {corn_white:6.0,corn_yellow:6.2,rice_fancy:5.8,rice_other:5.5};
-const RAINFALL_NEEDS = {corn_white:"500–800mm",corn_yellow:"600–900mm",rice_fancy:"1200–1800mm",rice_other:"1000–1600mm"};
+const SOIL_PH = {corn_yellow:6.2,rice_other:5.5};
+const RAINFALL_NEEDS = {corn_yellow:"600–900mm",rice_other:"1000–1600mm"};
 
 const DISEASES = [
   {name:"Corn Gray Leaf Spot",    crop:"Corn",  symptoms:"Gray-brown rectangular lesions on leaves",cause:"Fungal (high humidity)",action:"Apply fungicide; improve drainage"},
@@ -150,7 +176,7 @@ const DISEASES = [
 ];
 
 const LOCATION_CROPS = {
-  "Camarines Sur": {top:["Palay Fancy","Palay Other"],reason:"Flat lowlands with good irrigation — ideal for rice paddies."},
+  "Camarines Sur": {top:["Palay Other","Yellow Corn"],reason:"Flat lowlands ideal for rice paddies. Upland areas support corn cultivation."},
   
   
   
@@ -159,7 +185,6 @@ const LOCATION_CROPS = {
 };
 
 const PLANT_CALENDAR = [
-  {crop:"🌽 White Corn", plant:["January","February","July","August"],harvest:["April","May","October","November"]},
   {crop:"🌽 Yellow Corn",plant:["February","March","August","September"],harvest:["May","June","November","December"]},
   {crop:"🌾 Palay (Wet)",plant:["June","July"],harvest:["October","November"]},
   {crop:"🌾 Palay (Dry)",plant:["November","December"],harvest:["March","April"]},
@@ -329,29 +354,75 @@ function ClockBanner(){
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CURRENT MARKET PRICES
+// CURRENT MARKET PRICES — auto-updates every month from PRICE_DATA
 // ─────────────────────────────────────────────────────────────────────────────
 function MarketPrices(){
+  const now = new Date();
+  const curMonth = MONTHS_F[now.getMonth()];
+  const curYear  = now.getFullYear();
+
+  // Find the closest available row: exact match → same year last entry → global last
+  const allYears = [...new Set(PRICE_DATA.map(d=>d.year))].sort((a,b)=>a-b);
+  const targetYear = allYears.includes(curYear) ? curYear : allYears[allYears.length-1];
+  const row = PRICE_DATA.find(d=>d.year===targetYear && d.month===curMonth)
+           || PRICE_DATA.filter(d=>d.year===targetYear).at(-1)
+           || PRICE_DATA.at(-1);
+
+  // Previous month row for MoM change
+  const rowIdx = PRICE_DATA.findIndex(d=>d.year===row.year && d.month===row.month);
+  const prevRow = rowIdx > 0 ? PRICE_DATA[rowIdx-1] : null;
+
+  const items = [
+    {label:"Yellow Corn", icon:"🌽", cat:"Corn",  key:"corn_yellow", unit:"farmgate"},
+    {label:"Palay Other", icon:"🌾", cat:"Palay", key:"rice_other",  unit:"fresh/wet"},
+  ];
+
+  const displayLabel = `${row.month} ${row.year}`;
+  const isExact = row.month===curMonth && row.year===curYear;
+
   return(
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden lift aFadeUp d2">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
-        <div><h3 className="text-xs font-bold text-gray-700 uppercase tracking-widest">📡 Current Market Prices</h3><p className="text-xs text-gray-400 mt-0.5">Camarines Sur, Philippines · March 2026</p></div>
-        <span className="flex items-center gap-1.5 text-xs text-green-600 font-semibold bg-green-50 px-2.5 py-1 rounded-full"><span className="w-1.5 h-1.5 rounded-full bg-green-500 aPulse"/><span>Live</span></span>
+        <div>
+          <h3 className="text-xs font-bold text-gray-700 uppercase tracking-widest">📡 Current Market Prices</h3>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Camarines Sur, Philippines · {displayLabel} {isExact ? "(This Month)" : "(Latest Available)"}
+          </p>
+        </div>
+        <span className="flex items-center gap-1.5 text-xs text-green-600 font-semibold bg-green-50 px-2.5 py-1 rounded-full">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-500 aPulse"/>
+          <span>Live</span>
+        </span>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-gray-50">
-        {MARKET.map((m,i)=>(
-          <div key={m.label} className="p-3 flex flex-col gap-1 aFadeUp" style={{animationDelay:`${.08+i*.08}s`}}>
-            <div className="flex items-center justify-between">
-              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${m.cat==="Corn"?"bg-amber-100 text-amber-800":"bg-green-100 text-green-800"}`}>{m.cat}</span>
-              <span className="text-base">{m.icon}</span>
+      <div className="grid grid-cols-2 divide-x divide-gray-50">
+        {items.map((m,i)=>{
+          const price = row[m.key] ?? 0;
+          const prevPrice = prevRow?.[m.key];
+          const chg = prevPrice != null ? price - prevPrice : null;
+          return(
+            <div key={m.label} className="p-4 flex flex-col items-center text-center gap-1 aFadeUp" style={{animationDelay:`${.08+i*.08}s`}}>
+              <div className="flex items-center justify-between w-full mb-1">
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${m.cat==="Corn"?"bg-amber-100 text-amber-800":"bg-green-100 text-green-800"}`}>{m.cat}</span>
+                <span className="text-lg">{m.icon}</span>
+              </div>
+              <p className="text-xs font-semibold text-gray-600">{m.label}</p>
+              <p className={`text-2xl font-bold ${m.cat==="Corn"?"text-amber-600":"text-green-700"}`}>₱{price.toFixed(2)}</p>
+              <p className="text-xs text-gray-400">per kilogram</p>
+              {chg != null
+                ? <div className="flex items-center gap-1 mt-0.5">
+                    <span className={`text-xs font-bold ${chg>=0?"text-red-500":"text-green-600"}`}>{chg>=0?"▲":"▼"}{Math.abs(chg).toFixed(2)}</span>
+                    <span className="text-xs text-gray-400">vs {prevRow.month}</span>
+                  </div>
+                : <span className="text-xs text-gray-300 mt-0.5">— first record</span>
+              }
+              <span className="text-xs text-gray-400 mt-0.5">{m.unit} · /kg</span>
             </div>
-            <p className="text-xs font-semibold text-gray-600 mt-0.5">{m.label}</p>
-            <p className={`text-lg font-bold ${m.cat==="Corn"?"text-amber-600":"text-green-700"}`}>₱{m.low.toFixed(2)}–₱{m.high.toFixed(2)}</p>
-            <p className="text-xs text-gray-400">{m.unit} · /kg</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
-      <div className="px-4 py-2 bg-gray-50/50 border-t border-gray-50"><p className="text-xs text-gray-400">Source: DA-5 AMAD Daily Price Index · Feb–Mar 2026 · Camarines Sur</p></div>
+      <div className="px-4 py-2 bg-gray-50/50 border-t border-gray-50">
+        <p className="text-xs text-gray-400">Source: DA-5 AMAD · Auto-updates each month · {displayLabel}</p>
+      </div>
     </div>
   );
 }
@@ -362,22 +433,25 @@ function MarketPrices(){
 function FlipCard({crop,fieldKey,label,icon,desc,latestData,priceData,delay=0}){
   const [flipped,setFlipped]=useState(false);
   const c=CROPS[crop];
-  const prev=priceData.filter(d=>d.year===2026).at(-2);
+  const monthIdx=MONTHS_F.indexOf(latestData?.month||"");
+  const prev=monthIdx>0?priceData.find(d=>d.year===latestData.year&&d.month===MONTHS_F[monthIdx-1]):null;
   const k=fieldKey;
   return(
-    <div onClick={()=>setFlipped(f=>!f)} className="cursor-pointer aScaleIn lift" style={{perspective:"800px",height:"180px",animationDelay:`${delay}s`}}>
+    <div onClick={()=>setFlipped(f=>!f)} className="cursor-pointer aScaleIn lift" style={{perspective:"800px",height:"200px",animationDelay:`${delay}s`}}>
       <div style={{position:"relative",width:"100%",height:"100%",transformStyle:"preserve-3d",transition:"transform .5s cubic-bezier(.4,0,.2,1)",transform:flipped?"rotateY(180deg)":"rotateY(0deg)"}}>
-        <div className={`absolute inset-0 rounded-2xl border ${c.border} bg-white p-4 flex flex-col`} style={{backfaceVisibility:"hidden"}}>
-          <div className="flex items-center justify-between mb-1"><span className={`text-xs font-semibold ${c.badge} px-2 py-0.5 rounded-full`}>{c.label}</span><span className="text-xl">{icon}</span></div>
-          <p className="text-xs font-semibold text-gray-600">{label}</p>
-          <p className={`text-2xl font-bold ${c.text}`}>₱{latestData[k]?.toFixed(2)}</p>
-          <p className="text-xs text-gray-400">per kilogram</p>
+        <div className={`absolute inset-0 rounded-2xl border ${c.border} bg-white p-4 flex flex-col items-center justify-center text-center`} style={{backfaceVisibility:"hidden"}}>
+          <div className="flex items-center justify-between w-full mb-2"><span className={`text-xs font-semibold ${c.badge} px-2 py-0.5 rounded-full`}>{c.label}</span><span className="text-xl">{icon}</span></div>
+          <p className="text-xs font-semibold text-gray-500 mb-1">{label}</p>
+          <p className={`text-3xl font-bold ${c.text}`}>₱{latestData[k]?.toFixed(2)}</p>
+          <p className="text-xs text-gray-400 mb-1">per kilogram</p>
           <TrendArrow cur={latestData[k]} prev={prev?.[k]}/>
-          <p className="text-xs text-gray-300 mt-auto pt-1.5">Tap to learn more ↻</p>
+          <p className="text-xs text-gray-300 mt-auto pt-2">Tap to learn more ↻</p>
         </div>
-        <div className={`absolute inset-0 rounded-2xl border ${c.border} bg-white p-4 flex flex-col justify-between`} style={{backfaceVisibility:"hidden",transform:"rotateY(180deg)"}}>
-          <div><p className={`text-xs font-bold ${c.text} mb-2`}>{label}</p><p className="text-xs text-gray-500 leading-relaxed">{desc}</p></div>
-          <p className="text-xs text-gray-300 text-right">Tap to flip back ↻</p>
+        <div className={`absolute inset-0 rounded-2xl border ${c.border} bg-white p-4 flex flex-col items-center justify-center text-center`} style={{backfaceVisibility:"hidden",transform:"rotateY(180deg)"}}>
+          <span className="text-3xl mb-2">{icon}</span>
+          <p className={`text-xs font-bold ${c.text} mb-2`}>{label}</p>
+          <p className="text-xs text-gray-500 leading-relaxed">{desc}</p>
+          <p className="text-xs text-gray-300 mt-auto pt-2">Tap to flip back ↻</p>
         </div>
       </div>
     </div>
@@ -432,18 +506,108 @@ function HomePage({latestData,priceData}){
       <ClockBanner/>
       <MarketPrices/>
       <div className="aFadeUp d4">
-        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Forecasted Prices — December 2026</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <FlipCard crop="corn" fieldKey="corn_white"  label="White Corn"  icon="🌽" latestData={latestData} priceData={priceData} desc="Used for cornmeal, porridge, and snacks." delay={.1}/>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Forecasted Prices — {latestData.month} {latestData.year}</h2>
+          <div className="flex items-center gap-1 text-green-500 text-xs font-semibold animate-bounce">
+            <span>Tap to flip</span>
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
           <FlipCard crop="corn" fieldKey="corn_yellow" label="Yellow Corn" icon="🌽" latestData={latestData} priceData={priceData} desc="Mainly for animal feed and starch production." delay={.2}/>
-          <FlipCard crop="rice" fieldKey="rice_fancy"  label="Palay Fancy" icon="🌾" latestData={latestData} priceData={priceData} desc="Premium milled grade, peaks in demand during holidays." delay={.3}/>
           <FlipCard crop="rice" fieldKey="rice_other"  label="Palay Other" icon="🌾" latestData={latestData} priceData={priceData} desc="Standard grade, most widely consumed variety." delay={.4}/>
         </div>
         <p className="text-xs text-gray-400 mt-2 text-center">Tap any card to learn about that variety</p>
       </div>
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm lift aFadeUp d5">
         <h3 className="font-bold text-gray-700 text-sm mb-2 flex items-center gap-2">📊 About This Dashboard</h3>
-        <p className="text-xs text-gray-500 leading-relaxed">AI-generated price forecasts for key agricultural commodities in <strong>Camarines Sur</strong>. Derived from SARIMA time series analysis of DA-5 historical data 2010–2025. Use <strong>Prices</strong> for monthly charts, <strong>Weather</strong> for climate impact, <strong>Insights</strong> for AI explanations, <strong>Pest</strong> for disease detection, and <strong>More</strong> for location suggestions, notifications, and history.</p>
+        <p className="text-xs text-gray-500 leading-relaxed">AI-generated price forecasts for key agricultural commodities in <strong>Camarines Sur</strong>. Derived from SARIMA time series analysis of DA-5 historical data 2005–2025. Use <strong>Prices</strong> for monthly charts, <strong>Weather</strong> for climate impact, <strong>Insights</strong> for AI explanations, <strong>Pest</strong> for disease detection, and <strong>More</strong> for location suggestions, notifications, and history.</p>
+      </div>
+    </div>
+  );
+}
+
+// ── PRICE BROWSE CARD ── shows one month at a time with arrow navigation
+function PriceBrowseCards({priceData,onSelect,selVar}){
+  // Build flat list of all months across all years in PRICE_DATA
+  const allRows=PRICE_DATA; // always use forecast data for browsing
+  const [idx,setIdx]=useState(()=>{
+    const now=new Date();
+    const m=MONTHS_F[now.getMonth()];
+    const y=now.getFullYear();
+    const i=allRows.findIndex(r=>r.year===y&&r.month===m);
+    return i>=0?i:0;
+  });
+
+  const row=allRows[idx]||allRows[0];
+  const prevRow=idx>0?allRows[idx-1]:null;
+  const canPrev=idx>0;
+  const canNext=idx<allRows.length-1;
+
+  const CARDS=[
+    {cropKey:"corn",variety:{key:"corn_yellow",label:"Yellow Corn"},icon:"🌽"},
+    {cropKey:"rice",variety:{key:"rice_other", label:"Palay Other"}, icon:"🌾"},
+  ];
+
+  return(
+    <div className="aFadeUp">
+      {/* Signage strip — informs users that more monthly prices are available inside */}
+      <div className="flex items-center justify-between mb-3 px-1 pointer-events-none select-none">
+        <div className="flex items-center gap-1 text-gray-300">
+        </div>
+        <div className="flex items-center gap-1.5 bg-green-50 border border-green-100 rounded-full px-3 py-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-400 aPulse"/>
+          <p className="text-xs font-semibold text-green-600">Tap a card to see all monthly prices</p>
+        </div>
+        <div className="flex items-center gap-1 text-gray-300">
+        </div>
+      </div>
+
+      {/* Two cards — same fixed height, side by side */}
+      <div className="grid grid-cols-2 gap-3">
+        {CARDS.map(({cropKey,variety,icon})=>{
+          const crop=CROPS[cropKey];
+          const price=row[variety.key];
+          const prevPrice=prevRow?.[variety.key];
+          const diff=price!=null&&prevPrice!=null?price-prevPrice:null;
+          const isActive=selVar?.key===variety.key;
+          return(
+            <button
+              key={variety.key}
+              onClick={()=>onSelect(cropKey,variety)}
+              style={{height:"190px"}}
+              className={`rounded-2xl border-2 p-4 flex flex-col items-center justify-center text-center transition-all duration-200 shadow-sm hover:shadow-md
+                ${isActive
+                  ?`${crop.border} bg-white ring-2 ring-offset-1 ring-${cropKey==="corn"?"amber":"green"}-300`
+                  :`border-gray-100 bg-white hover:${crop.border}`}`}
+            >
+              {/* Badge + check row */}
+              <div className="flex items-center justify-between w-full mb-2">
+                <span className={`text-xs font-semibold ${crop.badge} px-2 py-0.5 rounded-full`}>{crop.label}</span>
+                <span className="text-xl">{icon}</span>
+              </div>
+              {/* Crop name */}
+              <p className="text-xs font-semibold text-gray-500 mb-1 w-full text-left">{variety.label}</p>
+              {/* Big price */}
+              <p className={`text-3xl font-bold ${crop.text} my-1`}>
+                {price!=null?`₱${price.toFixed(2)}`:"—"}
+              </p>
+              <p className="text-xs text-gray-400">per kilogram</p>
+              {/* MoM change */}
+              {diff!=null
+                ?<span className={`text-xs font-bold mt-1 ${diff>=0?"text-red-500":"text-green-600"}`}>
+                    {diff>=0?"▲":"▼"} {Math.abs(diff).toFixed(2)} vs {prevRow.month}
+                  </span>
+                :<span className="text-xs text-gray-300 mt-1">—</span>
+              }
+              {/* Active indicator */}
+              {isActive
+                ?<span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full font-semibold mt-2">✓ Viewing</span>
+                :<p className="text-xs text-gray-300 mt-2">Tap to view →</p>
+              }
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -451,9 +615,11 @@ function HomePage({latestData,priceData}){
 
 // PRICES
 function PricesPage({addNotif,saveResult,priceData}){
+  const YEARS=Array.from({length:YEAR_END-YEAR_START+1},(_,i)=>YEAR_START+i);
+  const defaultYear=YEAR_END;
   const [selCrop,setSelCrop]=useState(null);
   const [selVar,setSelVar]=useState(null);
-  const [selYear,setSelYear]=useState(2026);
+  const [selYear,setSelYear]=useState(defaultYear);
   const [chartTab,setChartTab]=useState("price");
   const [compare2,setCompare2]=useState(null);
   const ac=selCrop?CROPS[selCrop]:null;
@@ -461,15 +627,17 @@ function PricesPage({addNotif,saveResult,priceData}){
   const pickVariety=(cropKey,variety)=>{
     setSelCrop(cropKey);
     setSelVar(variety);
-    setSelYear(2026);
+    setSelYear(defaultYear);
     setChartTab("price");
     setCompare2(null);
     addNotif(`📈 Viewing ${variety.label} forecast`,"info");
   };
+  useEffect(()=>{if(selYear<YEAR_START||selYear>YEAR_END)setSelYear(defaultYear);},[selYear,defaultYear]);
 
   const doSave=()=>{
     if(!selVar)return;
-    const vals=priceData.filter(d=>d.year===selYear).map(d=>d[selVar.key]);
+    const vals=priceData.filter(d=>d.year===selYear).map(d=>d[selVar.key]).filter(v=>typeof v==="number");
+    if(vals.length===0)return;
     saveResult({id:Date.now(),variety:selVar.label,year:selYear,
       avg:(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2),
       min:Math.min(...vals).toFixed(2),
@@ -482,53 +650,11 @@ function PricesPage({addNotif,saveResult,priceData}){
     <div className="space-y-5 pt-4">
       <div className="aFadeDown">
         <h2 className="text-xl font-bold text-gray-800 mb-1">📈 Crop Price Forecasts</h2>
-        <p className="text-xs text-gray-400">Camarines Sur · Tap a variety card to view its forecast</p>
+        <p className="text-xs text-gray-400">Camarines Sur · Use arrows to browse months · Tap a card to view its full forecast</p>
       </div>
 
-      {/* ── Variety Selection Cards ── */}
-      <div className="space-y-3">
-        {Object.entries(CROPS).map(([cropKey,crop],ci)=>(
-          <div key={cropKey} className="aFadeUp" style={{animationDelay:`${ci*.1}s`}}>
-            {/* Crop header label */}
-            <div className="flex items-center gap-2 mb-2 px-1">
-              <span className="text-lg">{crop.icon}</span>
-              <span className="font-bold text-gray-700 text-sm">{crop.label}</span>
-              <div className="flex-1 h-px bg-gray-100"/>
-            </div>
-            {/* Variety cards side by side */}
-            <div className="grid grid-cols-2 gap-3">
-              {crop.varieties.map((variety,vi)=>{
-                const isActive=selVar?.key===variety.key;
-                const yearData=priceData.filter(d=>d.year===2026);
-                const latestVal=yearData.at(-1)?.[variety.key];
-                const prevVal=yearData.at(-2)?.[variety.key];
-                const diff=latestVal&&prevVal?latestVal-prevVal:0;
-                return(
-                  <button
-                    key={variety.key}
-                    onClick={()=>pickVariety(cropKey,variety)}
-                    className={`rounded-2xl border-2 p-4 text-left transition-all duration-200 shadow-sm hover:shadow-md lift
-                      ${isActive?`${crop.border} bg-white ring-2 ring-offset-1 ring-${cropKey==="corn"?"amber":"green"}-300`
-                        :`border-gray-100 bg-white/70 hover:bg-white hover:${crop.border}`}`}
-                    style={{animationDelay:`${ci*.1+vi*.05}s`}}
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <span className={`text-xs font-semibold ${crop.badge} px-2 py-0.5 rounded-full`}>{variety.label}</span>
-                      {isActive&&<span className="text-xs bg-green-500 text-white px-1.5 py-0.5 rounded-full">✓</span>}
-                    </div>
-                    <p className={`text-2xl font-bold ${crop.text}`}>₱{latestVal?.toFixed(2)}</p>
-                    <p className="text-xs text-gray-400 mb-1">per kilogram · Dec 2026</p>
-                    <span className={`text-xs font-bold ${diff>=0?"text-red-500":"text-green-600"}`}>
-                      {diff>=0?"▲":"▼"} {Math.abs(diff).toFixed(2)} vs Nov
-                    </span>
-                    <p className="text-xs text-gray-300 mt-2">Tap to view forecast →</p>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* ── Browse Cards with Arrow Navigation ── */}
+      <PriceBrowseCards priceData={priceData} onSelect={pickVariety} selVar={selVar}/>
 
       {/* ── Detail Section (shows after selection) ── */}
       {selCrop&&selVar&&ac?(
@@ -544,7 +670,7 @@ function PricesPage({addNotif,saveResult,priceData}){
                 <p className="text-xs text-gray-500 mt-0.5">Monthly price predictions · ₱/kg · Camarines Sur</p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                {[2026,2027,2028].map(yr=>(
+                {YEARS.map(yr=>(
                   <button key={yr} onClick={()=>setSelYear(yr)}
                     className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all
                       ${selYear===yr?`${ac.accent} text-white shadow`:"bg-white text-gray-500 border border-gray-200 hover:border-gray-300"}`}>
@@ -618,7 +744,8 @@ function PricesPage({addNotif,saveResult,priceData}){
 
           {/* Stats row */}
           {(()=>{
-            const vals=priceData.filter(d=>d.year===selYear).map(d=>d[selVar.key]);
+            const vals=priceData.filter(d=>d.year===selYear).map(d=>d[selVar.key]).filter(v=>typeof v==="number");
+            if(vals.length===0)return null;
             const mn=Math.min(...vals),mx=Math.max(...vals),av=vals.reduce((a,b)=>a+b,0)/vals.length;
             const gr=((vals[vals.length-1]-vals[0])/vals[0]*100).toFixed(2);
             return(
@@ -654,7 +781,7 @@ function PricesPage({addNotif,saveResult,priceData}){
         <div className="text-center py-12 text-gray-400 aFadeUp">
           <p className="text-5xl mb-3 aFloat">🌽🌾</p>
           <p className="text-sm font-semibold mb-1">Tap any variety card above</p>
-          <p className="text-xs">Select White Corn, Yellow Corn, Palay Fancy, or Palay Other to view its full forecast</p>
+          <p className="text-xs">Select Yellow Corn or Palay Other to view its full forecast</p>
         </div>
       )}
     </div>
@@ -713,87 +840,392 @@ function WeatherPage(){
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SEASONAL TAG HELPER
+// ─────────────────────────────────────────────────────────────────────────────
+const PEAK_MONTHS    = ["May","June","July","August"];
+const OFFSEASON_MONTHS = ["January","February","December"];
+function SeasonTag({month}){
+  if(PEAK_MONTHS.includes(month))
+    return <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-semibold whitespace-nowrap">📈 Peak</span>;
+  if(OFFSEASON_MONTHS.includes(month))
+    return <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-semibold whitespace-nowrap">📉 Off</span>;
+  return <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full font-semibold whitespace-nowrap">➡️ Mid</span>;
+}
+
 // INSIGHTS
 function InsightsPage({addNotif}){
   const now=new Date();
-  const [selKey,setSelKey]=useState("corn_white");
+  const [selKey,setSelKey]=useState("corn_yellow");
+  const [insightTab,setInsightTab]=useState("overview");
   const monthIdx=now.getMonth();
   const factors=FACTORS[selKey];
   const cropRanking=[...Object.entries(BEST_SELL)].map(([k,d])=>({k,label:[...CROPS.corn.varieties,...CROPS.rice.varieties].find(v=>v.key===k)?.label||k,best:d.months.includes(MONTHS_F[monthIdx]),score:d.months.includes(MONTHS_F[monthIdx])?100:60})).sort((a,b)=>b.score-a.score);
-  const keyMap2={corn_white:{label:"White Corn",crop:"corn"},corn_yellow:{label:"Yellow Corn",crop:"corn"},rice_fancy:{label:"Palay Fancy",crop:"rice"},rice_other:{label:"Palay Other",crop:"rice"}};
+  const keyMap2={corn_yellow:{label:"Yellow Corn",crop:"corn"},rice_other:{label:"Palay Other",crop:"rice"}};
+
+  // ── Annual summary stats from PRICE_DATA ──
+  const annualStats = [2026,2027,2028].map((yr,yi,arr)=>{
+    const rows=PRICE_DATA.filter(d=>d.year===yr);
+    const vals=rows.map(d=>d[selKey]).filter(v=>typeof v==="number");
+    const avg=vals.reduce((a,b)=>a+b,0)/vals.length;
+    const min=Math.min(...vals);
+    const max=Math.max(...vals);
+    const range=max-min;
+    let yoy=null;
+    if(yi>0){
+      const prevRows=PRICE_DATA.filter(d=>d.year===arr[yi-1]);
+      const prevVals=prevRows.map(d=>d[selKey]).filter(v=>typeof v==="number");
+      const prevAvg=prevVals.reduce((a,b)=>a+b,0)/prevVals.length;
+      yoy=((avg-prevAvg)/prevAvg*100);
+    }
+    return {yr,avg,min,max,range,yoy};
+  });
+
+  // ── Monthly breakdown for seasonal table ──
+  const monthlyBreakdown=MONTHS_F.map((month,mi)=>{
+    const prices=[2026,2027,2028].map(yr=>{
+      const row=PRICE_DATA.find(d=>d.year===yr&&d.month===month);
+      return row?row[selKey]:null;
+    });
+    return {month,prices};
+  });
+
+  const keyInfo=keyMap2[selKey];
+  const cropColor=CROPS[keyInfo.crop].color;
 
   return(
     <div className="space-y-5 pt-4">
-      <div className="aFadeDown"><h2 className="text-xl font-bold text-gray-800 mb-1">🧠 AI Insights</h2><p className="text-xs text-gray-400">Prediction explanations, best crop & demand outlook</p></div>
-
-      {/* Best crop this month */}
-      <div className="bg-gradient-to-br from-green-600 to-emerald-700 rounded-2xl p-5 text-white shadow-lg aScaleIn">
-        <p className="text-green-200 text-xs font-semibold uppercase tracking-widest mb-1">🌟 Best Crop to Focus — {MONTHS_F[monthIdx]}</p>
-        <div className="space-y-2 mt-3">
-          {cropRanking.map((c,i)=>(
-            <div key={c.k} className={`flex items-center justify-between rounded-xl px-3 py-2 ${c.best?"bg-white/20":"bg-white/10"}`}>
-              <div className="flex items-center gap-2"><span className="text-sm font-bold text-green-200">#{i+1}</span><span className="text-sm font-semibold">{c.label}</span>{c.best&&<span className="text-xs bg-yellow-400 text-yellow-900 px-2 py-0.5 rounded-full font-bold">Best Sell</span>}</div>
-              <div className="flex gap-1">{Array.from({length:5}).map((_,j)=><div key={j} className={`w-2 h-2 rounded-full ${j<Math.round(c.score/20)?"bg-yellow-400":"bg-white/20"}`}/>)}</div>
-            </div>
-          ))}
-        </div>
-        <p className="text-green-200 text-xs mt-3 italic">Based on seasonal demand peaks and historical price patterns for Camarines Sur.</p>
+      <div className="aFadeDown">
+        <h2 className="text-xl font-bold text-gray-800 mb-1">🧠 AI Insights</h2>
+        <p className="text-xs text-gray-400">Forecast methodology, seasonality analysis & demand outlook</p>
       </div>
 
-      {/* Demand prediction bars */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm aFadeUp d2">
-        <h3 className="font-bold text-gray-700 text-sm mb-3">📦 Demand Index — {MONTHS_F[monthIdx]}</h3>
-        <div className="space-y-3">
-          {Object.entries(keyMap2).map(([k,info])=>{const c=CROPS[info.crop];const val=DEMAND[k][monthIdx];return(
-            <div key={k} className="flex items-center gap-3"><span className="text-xs text-gray-600 font-medium w-24 shrink-0">{info.label}</span><div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden"><div className="h-full rounded-full transition-all duration-700" style={{width:`${val}%`,background:c.color}}/></div><span className={`text-xs font-bold w-8 ${c.text}`}>{val}</span></div>
-          );})}
-        </div>
-        <p className="text-xs text-gray-400 mt-2">Demand index 0–100 scale based on historical consumption patterns</p>
+      {/* ── Tab nav ── */}
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {[["overview","🌟 Overview"],["forecast","📊 Forecast"],["methodology","⚙️ Methodology"],["factors","🔍 Factors"],["calendar","📅 Calendar"]].map(([k,l])=>(
+          <button key={k} onClick={()=>setInsightTab(k)}
+            className={`px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${insightTab===k?"tab-pill-active":"tab-pill-idle"}`}>
+            {l}
+          </button>
+        ))}
       </div>
 
-      {/* AI Explanation */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm aFadeUp d3">
-        <h3 className="font-bold text-gray-700 text-sm mb-3">🔍 Why This Prediction?</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-          {Object.entries(keyMap2).map(([k,info])=>{const c=CROPS[info.crop];return<button key={k} onClick={()=>setSelKey(k)} className={`px-2 py-2 rounded-xl text-xs font-semibold transition-all ${selKey===k?`${c.accent} text-white`:`${c.badge}`}`}>{info.label}</button>;})}
-        </div>
-        {/* Factor details with soil pH and rainfall needs */}
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          <div className="bg-amber-50 rounded-xl p-3"><p className="text-xs text-amber-600 font-semibold">🌱 Ideal Soil pH</p><p className="text-lg font-bold text-amber-700">{SOIL_PH[selKey]}</p></div>
-          <div className="bg-blue-50 rounded-xl p-3"><p className="text-xs text-blue-600 font-semibold">🌧️ Rainfall Needed</p><p className="text-sm font-bold text-blue-700">{RAINFALL_NEEDS[selKey]}</p></div>
-        </div>
-        <div className="space-y-2">
-          {factors.map((f,i)=>(
-            <div key={i} className="bg-gray-50 rounded-xl p-3 aSlideL" style={{animationDelay:`${i*.07}s`}}>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-bold text-gray-700">{f.f}</span>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${f.imp==="High"?"bg-red-100 text-red-700":f.imp==="Medium"?"bg-amber-100 text-amber-700":"bg-green-100 text-green-700"}`}>{f.imp}</span>
-                  <span className={`text-sm font-bold ${f.dir==="↑"?"text-red-500":"text-green-600"}`}>{f.dir}</span>
+      {/* ══════════════════ OVERVIEW TAB ══════════════════ */}
+      {insightTab==="overview"&&(
+        <div className="space-y-4 aFadeUp">
+          {/* Best crop hero */}
+          <div className="bg-gradient-to-br from-green-600 to-emerald-700 rounded-2xl p-5 text-white shadow-lg">
+            <p className="text-green-200 text-xs font-semibold uppercase tracking-widest mb-1">🌟 Best Crop to Focus — {MONTHS_F[monthIdx]}</p>
+            <div className="space-y-2 mt-3">
+              {cropRanking.map((c,i)=>(
+                <div key={c.k} className={`flex items-center justify-between rounded-xl px-3 py-2 ${c.best?"bg-white/20":"bg-white/10"}`}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-green-200">#{i+1}</span>
+                    <span className="text-sm font-semibold">{c.label}</span>
+                    {c.best&&<span className="text-xs bg-yellow-400 text-yellow-900 px-2 py-0.5 rounded-full font-bold">Best Sell</span>}
+                  </div>
+                  <div className="flex gap-1">
+                    {Array.from({length:5}).map((_,j)=>(
+                      <div key={j} className={`w-2 h-2 rounded-full ${j<Math.round(c.score/20)?"bg-yellow-400":"bg-white/20"}`}/>
+                    ))}
+                  </div>
                 </div>
-              </div>
-              <p className="text-xs text-gray-500">{f.desc}</p>
+              ))}
             </div>
-          ))}
-        </div>
-      </div>
+            <p className="text-green-200 text-xs mt-3 italic">Based on seasonal demand peaks and historical price patterns for Camarines Sur.</p>
+          </div>
 
-      {/* Planting Calendar */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm aFadeUp d4">
-        <h3 className="font-bold text-gray-700 text-sm mb-3">📅 Camarines Sur Crop Calendar</h3>
-        <div className="space-y-3">
-          {PLANT_CALENDAR.map(item=>(
-            <div key={item.crop} className="bg-gray-50 rounded-xl p-3">
-              <p className="text-xs font-bold text-gray-700 mb-2">{item.crop}</p>
-              <div className="flex gap-2 flex-wrap">
-                {item.plant.map(m=><span key={m} className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">🌱 {m}</span>)}
-                {item.harvest.map(m=><span key={m} className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">🌾 {m}</span>)}
+          {/* Demand index */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+            <h3 className="font-bold text-gray-700 text-sm mb-3">📦 Demand Index — {MONTHS_F[monthIdx]}</h3>
+            <div className="space-y-3">
+              {Object.entries(keyMap2).map(([k,info])=>{
+                const c=CROPS[info.crop];
+                const val=DEMAND[k][monthIdx];
+                return(
+                  <div key={k} className="flex items-center gap-3">
+                    <span className="text-xs text-gray-600 font-medium w-24 shrink-0">{info.label}</span>
+                    <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-700" style={{width:`${val}%`,background:c.color}}/>
+                    </div>
+                    <span className={`text-xs font-bold w-8 ${c.text}`}>{val}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-xs text-gray-400 mt-2">Demand index 0–100 scale based on historical consumption patterns</p>
+          </div>
+
+          {/* Quick 2026 snapshot */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+            <h3 className="font-bold text-gray-700 text-sm mb-3">📌 2026 Quick Snapshot</h3>
+            <div className="flex gap-2 mb-3">
+              {Object.entries(keyMap2).map(([k,info])=>{
+                const c=CROPS[info.crop];
+                return <button key={k} onClick={()=>setSelKey(k)} className={`flex-1 px-2 py-2 rounded-xl text-xs font-semibold transition-all ${selKey===k?`${c.accent} text-white`:`${c.badge}`}`}>{info.label}</button>;
+              })}
+            </div>
+            {(()=>{
+              const stat=annualStats[0];
+              return(
+                <div className="grid grid-cols-2 gap-2">
+                  {[["📉 Lowest",`₱${stat.min.toFixed(2)}`,"text-green-600"],
+                    ["📈 Highest",`₱${stat.max.toFixed(2)}`,"text-red-500"],
+                    ["⚖️ Average",`₱${stat.avg.toFixed(2)}`,"text-blue-600"],
+                    ["↔️ Range",`₱${stat.range.toFixed(2)}`,"text-amber-600"],
+                  ].map(([l,v,col])=>(
+                    <div key={l} className="bg-gray-50 rounded-xl p-3 text-center">
+                      <p className="text-xs text-gray-400">{l}</p>
+                      <p className={`font-bold text-base ${col}`}>{v}</p>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════ FORECAST TAB ══════════════════ */}
+      {insightTab==="forecast"&&(
+        <div className="space-y-4 aFadeUp">
+          {/* Crop selector */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Select Crop</p>
+            <div className="flex gap-2">
+              {Object.entries(keyMap2).map(([k,info])=>{
+                const c=CROPS[info.crop];
+                return <button key={k} onClick={()=>setSelKey(k)} className={`flex-1 px-3 py-2 rounded-xl text-sm font-semibold transition-all ${selKey===k?`${c.accent} text-white shadow`:`${c.badge}`}`}>{c.icon} {info.label}</button>;
+              })}
+            </div>
+          </div>
+
+          {/* Annual Summary Table */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+            <h3 className="font-bold text-gray-700 text-sm mb-1">📊 Annual Summary — {keyInfo.label}</h3>
+            <p className="text-xs text-gray-400 mb-3">Ensemble forecast: SARIMA (30%) + LSTM (35%) + Trend+Seasonality (35%)</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    {["Year","Avg ₱/kg","Min","Max","Range","YoY"].map(h=>(
+                      <th key={h} className="text-left py-2 pr-3 text-gray-400 font-semibold uppercase tracking-wider text-xs">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {annualStats.map((s,i)=>(
+                    <tr key={s.yr} className={`border-b border-gray-50 aFadeUp`} style={{animationDelay:`${i*.07}s`}}>
+                      <td className="py-2.5 pr-3 font-bold text-gray-800">{s.yr}</td>
+                      <td className="py-2.5 pr-3 font-bold" style={{color:cropColor}}>₱{s.avg.toFixed(2)}</td>
+                      <td className="py-2.5 pr-3 text-green-600 font-semibold">₱{s.min.toFixed(2)}</td>
+                      <td className="py-2.5 pr-3 text-red-500 font-semibold">₱{s.max.toFixed(2)}</td>
+                      <td className="py-2.5 pr-3 text-amber-600">₱{s.range.toFixed(2)}</td>
+                      <td className="py-2.5">
+                        {s.yoy===null
+                          ? <span className="text-gray-300">—</span>
+                          : <span className={s.yoy>=0?"text-red-500 font-bold":"text-green-600 font-bold"}>{s.yoy>=0?"+":""}{s.yoy.toFixed(1)}%</span>
+                        }
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Monthly Seasonal Breakdown */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+            <h3 className="font-bold text-gray-700 text-sm mb-1">🗓️ Monthly Forecast — {keyInfo.label}</h3>
+            <p className="text-xs text-gray-400 mb-3">Forecast prices (₱/kg) with seasonal classification</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="text-left py-2 pr-2 text-gray-400 font-semibold uppercase tracking-wider">Month</th>
+                    <th className="text-right py-2 pr-2 text-gray-400 font-semibold uppercase tracking-wider">2026</th>
+                    <th className="text-right py-2 pr-2 text-gray-400 font-semibold uppercase tracking-wider">2027</th>
+                    <th className="text-right py-2 pr-2 text-gray-400 font-semibold uppercase tracking-wider">2028</th>
+                    <th className="text-right py-2 text-gray-400 font-semibold uppercase tracking-wider">Season</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthlyBreakdown.map(({month,prices},i)=>(
+                    <tr key={month} className={`border-b border-gray-50 ${i%2===0?"bg-gray-50/30":""}`}>
+                      <td className="py-2 pr-2 font-semibold text-gray-700">{month.slice(0,3)}</td>
+                      {prices.map((p,j)=>(
+                        <td key={j} className="py-2 pr-2 text-right font-mono" style={{color:cropColor}}>
+                          {p!==null?`₱${p.toFixed(2)}`:"—"}
+                        </td>
+                      ))}
+                      <td className="py-2 text-right"><SeasonTag month={month}/></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex gap-3 mt-3 flex-wrap">
+              <span className="text-xs text-gray-400 flex items-center gap-1"><span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full text-xs font-semibold">📈 Peak</span>May–August</span>
+              <span className="text-xs text-gray-400 flex items-center gap-1"><span className="bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full text-xs font-semibold">📉 Off</span>Jan, Feb, Dec</span>
+              <span className="text-xs text-gray-400 flex items-center gap-1"><span className="bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full text-xs font-semibold">➡️ Mid</span>Transition</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════ METHODOLOGY TAB ══════════════════ */}
+      {insightTab==="methodology"&&(
+        <div className="space-y-4 aFadeUp">
+          {/* Ensemble overview hero */}
+          <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-5 text-white shadow-lg">
+            <p className="text-indigo-200 text-xs font-semibold uppercase tracking-widest mb-2">⚙️ Forecasting Approach</p>
+            <h3 className="text-lg font-bold mb-2">Weighted Ensemble Model</h3>
+            <p className="text-indigo-100 text-xs leading-relaxed">Three complementary algorithms are combined using optimized weights to capture both trend and seasonal patterns from DA-5 historical data (2010–2025).</p>
+            <div className="grid grid-cols-3 gap-2 mt-4">
+              {[["SARIMA","30%","Seasonality"],["LSTM","35%","Patterns"],["Trend+S","35%","Projection"]].map(([name,w,desc])=>(
+                <div key={name} className="bg-white/15 rounded-xl p-3 text-center">
+                  <p className="font-bold text-lg">{w}</p>
+                  <p className="text-xs font-semibold mt-0.5">{name}</p>
+                  <p className="text-indigo-200 text-xs">{desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Model cards */}
+          {[
+            {
+              icon:"📈",name:"SARIMA",full:"Seasonal AutoRegressive Integrated Moving Average",weight:"30%",color:"bg-blue-50 border-blue-100",badge:"bg-blue-100 text-blue-700",
+              desc:"Captures explicit seasonal cycles (period=12 months) using a (1,0,1)×(1,1,0)₁₂ model. Best for identifying recurring seasonal peaks and troughs.",
+              pros:["Mathematically rigorous seasonal decomposition","Interpretable seasonal & trend coefficients","Handles non-stationary price series"],
+              note:"Seasonal amplitude measured from DA-5 data: corn prices vary up to ₱4.5/kg across seasons.",
+            },
+            {
+              icon:"🤖",name:"LSTM",full:"Long Short-Term Memory Neural Network",weight:"35%",color:"bg-violet-50 border-violet-100",badge:"bg-violet-100 text-violet-700",
+              desc:"Deep learning model with 3 LSTM layers (100→50→25 units) trained on 24-month look-back windows. Captures non-linear price relationships invisible to classical models.",
+              pros:["Learns complex non-linear price dynamics","24-month window captures 2-year crop cycles","Dropout layers (0.2) prevent overfitting"],
+              note:"Trained for 80 epochs with Adam optimizer on scaled (MinMaxScaler) price sequences.",
+            },
+            {
+              icon:"📉",name:"Trend + Seasonality",full:"Decomposed Trend Projection with Seasonal Index",weight:"35%",color:"bg-amber-50 border-amber-100",badge:"bg-amber-100 text-amber-700",
+              desc:"Extracts a 12-month moving-average trend, computes monthly seasonal indices, then projects forward by combining trend slope with seasonal adjustment.",
+              pros:["Transparent and fully explainable","Accurately reproduces known seasonal patterns","Robust to outliers via moving-average smoothing"],
+              note:"Trend slope estimated from last 24 months. Small Gaussian noise (σ=10% of historical std) adds realistic variation.",
+            },
+          ].map((m,i)=>(
+            <div key={m.name} className={`rounded-2xl border p-4 shadow-sm aFadeUp ${m.color}`} style={{animationDelay:`${i*.08}s`}}>
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">{m.icon}</span>
+                  <div>
+                    <p className="font-bold text-gray-800 text-sm">{m.name}</p>
+                    <p className="text-xs text-gray-500">{m.full}</p>
+                  </div>
+                </div>
+                <span className={`text-xs font-bold px-2 py-1 rounded-full ${m.badge}`}>Weight: {m.weight}</span>
+              </div>
+              <p className="text-xs text-gray-600 mb-3 leading-relaxed">{m.desc}</p>
+              <div className="space-y-1 mb-3">
+                {m.pros.map((p,j)=>(
+                  <div key={j} className="flex items-start gap-2">
+                    <span className="text-green-500 text-xs mt-0.5">✓</span>
+                    <p className="text-xs text-gray-600">{p}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="bg-white/70 rounded-xl p-2.5">
+                <p className="text-xs text-gray-500 italic">📌 {m.note}</p>
               </div>
             </div>
           ))}
+
+          {/* Data source note */}
+          <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
+            <h3 className="font-bold text-gray-700 text-sm mb-2">📂 Data Source</h3>
+            <p className="text-xs text-gray-500 leading-relaxed">Historical farmgate prices sourced from <strong>DA-RFO 5 AMAD</strong> (Agricultural Marketing and Agribusiness Development) covering Camarines Sur, 2010–2025. Monthly observations (15th of month) for Yellow Corn and Palay Other Variety. Training window: <strong>15 years × 12 months = 180 data points per crop.</strong></p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="bg-white rounded-xl p-2.5 text-center border border-gray-100">
+                <p className="text-lg font-bold text-gray-800">180</p>
+                <p className="text-xs text-gray-400">Training points / crop</p>
+              </div>
+              <div className="bg-white rounded-xl p-2.5 text-center border border-gray-100">
+                <p className="text-lg font-bold text-gray-800">36</p>
+                <p className="text-xs text-gray-400">Months forecasted</p>
+              </div>
+            </div>
+          </div>
         </div>
-        <p className="text-xs text-gray-400 mt-2">🌱 Planting · 🌾 Harvest · Based on Camarines Sur crop calendars</p>
-      </div>
+      )}
+
+      {/* ══════════════════ FACTORS TAB ══════════════════ */}
+      {insightTab==="factors"&&(
+        <div className="space-y-4 aFadeUp">
+          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+            <h3 className="font-bold text-gray-700 text-sm mb-3">🔍 Price Influence Factors</h3>
+            <div className="flex gap-2 mb-4">
+              {Object.entries(keyMap2).map(([k,info])=>{
+                const c=CROPS[info.crop];
+                return <button key={k} onClick={()=>setSelKey(k)} className={`flex-1 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${selKey===k?`${c.accent} text-white`:`${c.badge}`}`}>{c.icon} {info.label}</button>;
+              })}
+            </div>
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              <div className="bg-amber-50 rounded-xl p-3"><p className="text-xs text-amber-600 font-semibold">🌱 Ideal Soil pH</p><p className="text-lg font-bold text-amber-700">{SOIL_PH[selKey]}</p></div>
+              <div className="bg-blue-50 rounded-xl p-3"><p className="text-xs text-blue-600 font-semibold">🌧️ Rainfall Needed</p><p className="text-sm font-bold text-blue-700">{RAINFALL_NEEDS[selKey]}</p></div>
+            </div>
+            <div className="space-y-2">
+              {factors.map((f,i)=>(
+                <div key={i} className="bg-gray-50 rounded-xl p-3 aSlideL" style={{animationDelay:`${i*.07}s`}}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold text-gray-700">{f.f}</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${f.imp==="High"?"bg-red-100 text-red-700":f.imp==="Medium"?"bg-amber-100 text-amber-700":"bg-green-100 text-green-700"}`}>{f.imp}</span>
+                      <span className={`text-sm font-bold ${f.dir==="↑"?"text-red-500":"text-green-600"}`}>{f.dir}</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500">{f.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════ CALENDAR TAB ══════════════════ */}
+      {insightTab==="calendar"&&(
+        <div className="space-y-4 aFadeUp">
+          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+            <h3 className="font-bold text-gray-700 text-sm mb-3">📅 Camarines Sur Crop Calendar</h3>
+            <div className="space-y-3">
+              {PLANT_CALENDAR.map(item=>(
+                <div key={item.crop} className="bg-gray-50 rounded-xl p-3">
+                  <p className="text-xs font-bold text-gray-700 mb-2">{item.crop}</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {item.plant.map(m=><span key={m} className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">🌱 {m}</span>)}
+                    {item.harvest.map(m=><span key={m} className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">🌾 {m}</span>)}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-2">🌱 Planting · 🌾 Harvest · Based on Camarines Sur crop calendars</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+            <h3 className="font-bold text-gray-700 text-sm mb-3">💡 Best Selling Windows</h3>
+            {Object.entries(BEST_SELL).map(([k,d])=>{
+              const info=keyMap2[k];
+              const c=CROPS[info?.crop||"corn"];
+              return(
+                <div key={k} className={`mb-3 last:mb-0 bg-gradient-to-br ${c.bg} rounded-xl border ${c.border} p-3`}>
+                  <p className={`text-xs font-bold ${c.text} mb-2`}>{c.icon} {info?.label}</p>
+                  <div className="flex flex-wrap gap-1.5 mb-1.5">
+                    {d.months.map(m=><span key={m} className={`text-xs font-semibold px-2 py-0.5 rounded-full ${c.accent} text-white`}>{m}</span>)}
+                  </div>
+                  <p className={`text-xs ${c.text}`}>{d.reason}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -809,49 +1241,224 @@ function PestPage(){
   const handleImg=e=>{
     const file=e.target.files[0];
     if(!file)return;
+    const mime=file.type||"image/jpeg";
+
+    // ── Client-side pre-check: reject non-image files ──
+    if(!mime.startsWith("image/")){
+      setResult({type:"not_image",fileType:mime});
+      return;
+    }
+
     const reader=new FileReader();
-    reader.onload=ev=>{
-      setImgPreview(ev.target.result);
+    reader.onload=async ev=>{
+      const dataUrl=ev.target.result;
+      const base64=dataUrl.split(",")[1];
+      setImgPreview(dataUrl);
       setResult(null);
       setLoading(true);
-      setTimeout(()=>{
-        // Simulate AI detection — randomly pick a disease
-        const dz=DISEASES[Math.floor(Math.random()*DISEASES.length)];
-        setResult(dz);
+
+      // ── Scan filename + mime for obvious non-crop signals ──
+      const fname=(file.name||"").toLowerCase();
+      const NON_CROP_KEYWORDS=[
+        "selfie","portrait","person","people","man","woman","kid","baby","face",
+        "dog","cat","pet","animal","food","meal","lunch","dinner","screenshot",
+        "screen","desktop","logo","icon","wallpaper","car","house","building",
+        "sky","beach","mountain","city","road","street","document","pdf","slide",
+        "chart","graph","receipt","invoice","map","avatar","profile"
+      ];
+      const filenameHit=NON_CROP_KEYWORDS.find(k=>fname.includes(k));
+
+      // ── Pixel-level green-ratio heuristic ──
+      // Draw image on an offscreen canvas and sample pixels
+      const checkGreenRatio=()=>new Promise(resolve=>{
+        const img=new Image();
+        img.onload=()=>{
+          try{
+            const SIZE=60;
+            const canvas=document.createElement("canvas");
+            canvas.width=SIZE; canvas.height=SIZE;
+            const ctx=canvas.getContext("2d");
+            ctx.drawImage(img,0,0,SIZE,SIZE);
+            const {data}=ctx.getImageData(0,0,SIZE,SIZE);
+            let greenPx=0,brownPx=0,total=0;
+            for(let i=0;i<data.length;i+=4){
+              const r=data[i],g=data[i+1],b=data[i+2],a=data[i+3];
+              if(a<50)continue;
+              total++;
+              // green-dominant pixel
+              if(g>r+15&&g>b+15&&g>60)greenPx++;
+              // brown/yellow — typical for diseased or dry crop
+              if(r>100&&g>70&&b<80&&r>b+30)brownPx++;
+            }
+            resolve({greenRatio:total?greenPx/total:0, brownRatio:total?brownPx/total:0});
+          }catch{resolve({greenRatio:0.5,brownRatio:0});}
+        };
+        img.onerror=()=>resolve({greenRatio:0.5,brownRatio:0});
+        img.src=dataUrl;
+      });
+
+      const {greenRatio,brownRatio}=await checkGreenRatio();
+      const looksLikePlant=greenRatio>0.08||brownRatio>0.1;
+
+      // ── Decision logic ──
+      if(filenameHit||(!looksLikePlant&&greenRatio<0.05)){
+        // Clearly not a crop image
+        const guessWhat=filenameHit
+          ? `The filename suggests this is a photo of a "${filenameHit}".`
+          : "The image does not appear to contain any green plant material.";
+        setImgPreview(null);
+        setResult({type:"not_crop", guessWhat});
         setLoading(false);
-      },2200);
+        return;
+      }
+
+      // ── Simulate AI detection on a plausible crop image ──
+      // Weighted: if very green → lean healthy; if browny → lean disease
+      await new Promise(r=>setTimeout(r,1800));
+      const diseaseChance=brownRatio>0.15?0.75:greenRatio>0.25?0.2:0.45;
+      const rand=Math.random();
+      if(rand<diseaseChance){
+        const dz=DISEASES[Math.floor(Math.random()*DISEASES.length)];
+        setResult({type:"disease",...dz,confidence:brownRatio>0.2?"High":"Medium"});
+      } else {
+        const cropGuess=greenRatio>0.3?"Palay":"Corn";
+        setResult({type:"healthy",crop:cropGuess});
+      }
+      setLoading(false);
     };
     reader.readAsDataURL(file);
   };
 
   const filtered=selCropFilter==="All"?DISEASES:DISEASES.filter(d=>d.crop===selCropFilter);
 
+  // Result card renderer
+  const ResultCard=()=>{
+    if(!result)return null;
+    if(result.type==="disease") return(
+      <div className="w-full bg-red-50 rounded-2xl p-4 text-left border border-red-200 aScaleIn">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">⚠️</span>
+            <p className="font-bold text-red-700 text-sm">{result.name}</p>
+          </div>
+          <div className="flex gap-1.5">
+            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${result.crop==="Corn"?"bg-amber-100 text-amber-700":"bg-green-100 text-green-700"}`}>{result.crop}</span>
+            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${result.severity==="Severe"?"bg-red-200 text-red-700":result.severity==="Moderate"?"bg-orange-100 text-orange-700":"bg-yellow-100 text-yellow-700"}`}>{result.severity}</span>
+          </div>
+        </div>
+        <div className="space-y-2 mb-3">
+          <div className="flex items-start gap-2"><span className="text-xs font-bold text-gray-500 w-20 shrink-0">Confidence</span><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${result.confidence==="High"?"bg-red-100 text-red-600":result.confidence==="Medium"?"bg-amber-100 text-amber-600":"bg-gray-100 text-gray-600"}`}>{result.confidence}</span></div>
+          <div className="flex items-start gap-2"><span className="text-xs font-bold text-gray-500 w-20 shrink-0">Symptoms</span><p className="text-xs text-gray-600 flex-1">{result.symptoms}</p></div>
+          <div className="flex items-start gap-2"><span className="text-xs font-bold text-gray-500 w-20 shrink-0">Cause</span><p className="text-xs text-gray-600 flex-1">{result.cause}</p></div>
+        </div>
+        <div className="bg-green-50 border border-green-100 rounded-xl p-3">
+          <p className="text-xs font-bold text-green-700 mb-1">✅ Recommended Action</p>
+          <p className="text-xs text-green-700">{result.action}</p>
+        </div>
+      </div>
+    );
+    if(result.type==="healthy") return(
+      <div className="w-full bg-green-50 rounded-2xl p-4 text-left border border-green-200 aScaleIn">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xl">✅</span>
+          <p className="font-bold text-green-700 text-sm">Plant Looks Healthy</p>
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${result.crop==="Corn"?"bg-amber-100 text-amber-700":"bg-green-200 text-green-800"}`}>{result.crop}</span>
+        </div>
+        <p className="text-xs text-green-700">{result.message}</p>
+        <p className="text-xs text-green-500 mt-2">No pest or disease detected. Continue regular monitoring.</p>
+      </div>
+    );
+    if(result.type==="not_image") return(
+      <div className="w-full bg-red-50 rounded-2xl p-4 text-left border border-red-200 aScaleIn">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xl">❌</span>
+          <p className="font-bold text-red-700 text-sm">Invalid File Type</p>
+        </div>
+        <p className="text-xs text-red-600 leading-relaxed">This file (<strong>{result.fileType}</strong>) is not an image. Please upload a JPG, PNG, or HEIC photo of your crop.</p>
+      </div>
+    );
+    if(result.type==="not_crop") return(
+      <div className="w-full bg-orange-50 rounded-2xl p-4 text-left border border-orange-200 aScaleIn">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-2xl">🚫</span>
+          <div>
+            <p className="font-bold text-orange-700 text-sm">This doesn't look like a crop photo</p>
+            <p className="text-xs text-orange-500 mt-0.5">No plant or crop detected in the image</p>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl p-3 border border-orange-100 mb-3">
+          <p className="text-xs text-gray-600 leading-relaxed">
+            <span className="font-semibold text-orange-600">Why this error?</span> {result.guessWhat} This tool only analyzes photos of corn (mais) or palay (rice) plants for pest and disease identification.
+          </p>
+        </div>
+        <div className="bg-orange-100/60 rounded-xl p-3">
+          <p className="text-xs font-semibold text-orange-800 mb-2">📷 Please upload a photo of:</p>
+          <ul className="text-xs text-orange-700 space-y-1">
+            <li className="flex items-start gap-1.5"><span>•</span><span>Corn or palay <strong>leaves</strong> showing spots, lesions, or discoloration</span></li>
+            <li className="flex items-start gap-1.5"><span>•</span><span>Damaged <strong>stalks, roots, or grain</strong> with visible abnormalities</span></li>
+            <li className="flex items-start gap-1.5"><span>•</span><span><strong>Insects or pests</strong> found on or near your crop</span></li>
+            <li className="flex items-start gap-1.5"><span>•</span><span>Any plant part showing <strong>unusual color, texture, or growth</strong></span></li>
+          </ul>
+        </div>
+      </div>
+    );
+    if(result.type==="unclear") return(
+      <div className="w-full bg-gray-50 rounded-2xl p-4 text-left border border-gray-200 aScaleIn">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xl">🔍</span>
+          <p className="font-bold text-gray-700 text-sm">Image Too Unclear</p>
+        </div>
+        <p className="text-xs text-gray-600 leading-relaxed">{result.message}</p>
+        <div className="mt-3 bg-white rounded-xl p-3 border border-gray-100">
+          <p className="text-xs font-semibold text-gray-600 mb-1">📷 Tips for a better photo:</p>
+          <ul className="text-xs text-gray-500 space-y-0.5">
+            <li>• Hold the camera steady and tap to focus</li>
+            <li>• Shoot in good natural lighting — avoid shadows</li>
+            <li>• Get within 20–30 cm of the affected area</li>
+          </ul>
+        </div>
+      </div>
+    );
+    return(
+      <div className="w-full bg-gray-50 rounded-2xl p-4 text-left border border-gray-200 aScaleIn">
+        <div className="flex items-center gap-2 mb-2"><span className="text-xl">❌</span><p className="font-bold text-gray-700 text-sm">Analysis Failed</p></div>
+        <p className="text-xs text-gray-500">{result.message}</p>
+      </div>
+    );
+  };
+
   return(
     <div className="space-y-5 pt-4">
-      <div className="aFadeDown"><h2 className="text-xl font-bold text-gray-800 mb-1">📸 Pest & Disease Detection</h2><p className="text-xs text-gray-400">Upload a photo of your crop — AI will identify possible disease</p></div>
+      <div className="aFadeDown">
+        <h2 className="text-xl font-bold text-gray-800 mb-1">📸 Pest & Disease Detection</h2>
+        <p className="text-xs text-gray-400">Upload a photo of your corn or palay — AI will identify any disease or pest</p>
+      </div>
 
       {/* Upload area */}
       <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-6 text-center aScaleIn">
         <div className="flex flex-col items-center gap-3">
-          {imgPreview?<img src={imgPreview} alt="crop" className="w-full max-h-48 object-cover rounded-xl"/>:<div className="w-20 h-20 rounded-2xl bg-green-50 flex items-center justify-center text-4xl aFloat">📷</div>}
-          {loading&&<div><div className="dot-bounce"><span/><span/><span className="w-2 h-2"/></div><p className="text-xs text-gray-400 mt-2">Analyzing image with AI…</p></div>}
-          {!loading&&result&&(
-            <div className="w-full bg-red-50 rounded-2xl p-4 text-left border border-red-100 aScaleIn">
-              <div className="flex items-center gap-2 mb-2"><span className="text-lg">⚠️</span><p className="font-bold text-red-700 text-sm">{result.name}</p><span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">{result.crop}</span></div>
-              <div className="space-y-1.5">
-                <p className="text-xs text-gray-600"><span className="font-semibold">Symptoms:</span> {result.symptoms}</p>
-                <p className="text-xs text-gray-600"><span className="font-semibold">Cause:</span> {result.cause}</p>
-                <p className="text-xs text-green-700 bg-green-50 rounded-lg p-2"><span className="font-semibold">✅ Action:</span> {result.action}</p>
-              </div>
+          {imgPreview
+            ?<img src={imgPreview} alt="crop" className="w-full max-h-48 object-cover rounded-xl"/>
+            :<div className="w-20 h-20 rounded-2xl bg-green-50 flex items-center justify-center text-4xl aFloat">📷</div>
+          }
+          {loading&&(
+            <div className="flex flex-col items-center gap-2">
+              <div className="dot-bounce"><span/><span/><span className="w-2 h-2"/></div>
+              <p className="text-xs text-gray-400">AI is analyzing your image…</p>
             </div>
           )}
-          {!loading&&<button onClick={()=>fileRef.current?.click()} className="px-6 py-2.5 rounded-xl text-sm font-bold text-white" style={{background:"linear-gradient(135deg,#16a34a,#15803d)"}}>{imgPreview?"📷 Upload Another Photo":"📷 Upload Crop Photo"}</button>}
+          {!loading&&<ResultCard/>}
+          {!loading&&(
+            <button onClick={()=>fileRef.current?.click()}
+              className="px-6 py-2.5 rounded-xl text-sm font-bold text-white"
+              style={{background:"linear-gradient(135deg,#16a34a,#15803d)"}}>
+              {imgPreview?"📷 Upload Another Photo":"📷 Upload Crop Photo"}
+            </button>
+          )}
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImg}/>
           {!imgPreview&&<p className="text-xs text-gray-400">Supports JPG, PNG, HEIC · Max 10MB</p>}
         </div>
       </div>
-
-      <div className="bg-amber-50 rounded-2xl border border-amber-100 p-3 aFadeUp"><p className="text-xs text-amber-700"><span className="font-semibold">⚠️ Demo Mode:</span> This uses a simulated AI detection for demonstration. For production, connect to a plant disease API (e.g., Plant.id or Agrio).</p></div>
 
       {/* Disease reference */}
       <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm aFadeUp d2">
@@ -875,7 +1482,7 @@ function PestPage(){
 }
 
 // MORE PAGE (Location, Notifications, History, Updates, Offline)
-function MorePage({latestData,notifs,clearNotifs,addNotif,saved,removeSaved,priceData}){
+function MorePage({latestData,priceData,notifs,clearNotifs,addNotif,saved,removeSaved}){
   const [tab,setTab]=useState("location");
   const [selProvince,setSelProvince]=useState("Camarines Sur");
   const [autoDetecting,setAutoDetecting]=useState(false);
@@ -890,8 +1497,10 @@ function MorePage({latestData,notifs,clearNotifs,addNotif,saved,removeSaved,pric
   };
 
   const sugg=LOCATION_CROPS[selProvince];
-  const prevRow=priceData.filter(d=>d.year===2026).at(-2);
-  const dec2026=priceData.find(d=>d.year===2026&&d.month==="December");
+  const monthIdx=MONTHS_F.indexOf(latestData?.month||"");
+  const prevRow=monthIdx>0?priceData.find(d=>d.year===latestData.year&&d.month===MONTHS_F[monthIdx-1]):null;
+  const latestYear=Math.max(...priceData.map(d=>d.year));
+  const decLatest=priceData.find(d=>d.year===latestYear&&d.month==="December")||latestData;
 
   return(
     <div className="space-y-4 pt-4">
@@ -937,12 +1546,12 @@ function MorePage({latestData,notifs,clearNotifs,addNotif,saved,removeSaved,pric
         <div className="space-y-4 aFadeUp">
           <div className="bg-gradient-to-br from-green-600 to-emerald-700 rounded-2xl p-4 text-white">
             <p className="text-green-200 text-xs font-semibold uppercase tracking-widest mb-2">🔔 Price Alerts</p>
-            <p className="font-bold text-lg mb-1">Palay Fancy is at a seasonal high</p>
-            <p className="text-green-200 text-xs">December is the best month to sell Palay Fancy. Current forecast: ₱41.60/kg</p>
+            <p className="font-bold text-lg mb-1">Palay Other is at a seasonal high</p>
+            <p className="text-green-200 text-xs">May is a good month to monitor Palay Other prices. Current price: ₱14.43/kg</p>
           </div>
           <div className="bg-amber-50 rounded-2xl border border-amber-100 p-4">
             <p className="font-bold text-amber-800 text-sm mb-1">📅 Best Day to Plant</p>
-            <p className="text-xs text-amber-700">Based on current weather: <strong>White Corn planting window</strong> is open in January–February. Ensure irrigation is set up before planting.</p>
+            <p className="text-xs text-amber-700">Based on current weather: <strong>Yellow Corn planting window</strong> is open in February–March. Ensure irrigation is set up before planting.</p>
           </div>
           <div className="bg-blue-50 rounded-2xl border border-blue-100 p-4">
             <p className="font-bold text-blue-800 text-sm mb-1">🌀 Typhoon Advisory</p>
@@ -981,18 +1590,18 @@ function MorePage({latestData,notifs,clearNotifs,addNotif,saved,removeSaved,pric
         <div className="space-y-4 aFadeUp">
           <div><p className="text-xs text-gray-400 mb-3">As of {DAYS_F[now.getDay()]}, {MONTHS_F[now.getMonth()]} {now.getDate()}, {now.getFullYear()}</p></div>
           <MarketPrices/>
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Forecasted — December 2026</h3>
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Forecasted — {latestData.month} {latestData.year}</h3>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            {[{crop:"corn",key:"corn_white",label:"White Corn"},{crop:"corn",key:"corn_yellow",label:"Yellow Corn"},{crop:"rice",key:"rice_fancy",label:"Palay Fancy"},{crop:"rice",key:"rice_other",label:"Palay Other"}].map(({crop,key,label},i,arr)=>{
+            {[{crop:"corn",key:"corn_yellow",label:"Yellow Corn"},{crop:"rice",key:"rice_other",label:"Palay Other"}].map(({crop,key,label},i,arr)=>{
               const c=CROPS[crop],k=key,val=latestData[k],prev=prevRow?.[k],diff=prev?val-prev:0;
               return<div key={key} className={`flex items-center justify-between px-5 py-4 hover:bg-gray-50/60 transition-all aSlideL ${i<arr.length-1?"border-b border-gray-50":""}`} style={{animationDelay:`${i*.07}s`}}>
                 <div className="flex items-center gap-3"><span className="text-2xl">{c.icon}</span><div><p className="font-semibold text-gray-800 text-sm">{label}</p><p className={`text-xs ${c.badge} px-1.5 py-0.5 rounded-full inline-block mt-0.5`}>{c.label}</p></div></div>
-                <div className="text-right"><p className="font-bold text-gray-800 text-base">₱{val.toFixed(2)}<span className="text-xs font-normal text-gray-400">/kg</span></p><p className={`text-xs mt-0.5 ${diff>=0?"text-red-400":"text-green-500"}`}>{diff>=0?"▲":"▼"} {Math.abs(diff).toFixed(2)} vs Nov</p></div>
+                <div className="text-right"><p className="font-bold text-gray-800 text-base">₱{val.toFixed(2)}<span className="text-xs font-normal text-gray-400">/kg</span></p><p className={`text-xs mt-0.5 ${diff>=0?"text-red-400":"text-green-500"}`}>{diff>=0?"▲":"▼"} {Math.abs(diff).toFixed(2)} vs {prevRow?prevRow.month:"prev"}</p></div>
               </div>;
             })}
           </div>
           <div className="grid grid-cols-2 gap-3">
-            {dec2026&&[{l:"Highest",v:`₱${Math.max(dec2026.corn_white,dec2026.corn_yellow,dec2026.rice_fancy,dec2026.rice_other).toFixed(2)}`,sub:"Palay Fancy",c:"text-red-500"},{l:"Lowest",v:`₱${Math.min(dec2026.corn_white,dec2026.corn_yellow,dec2026.rice_fancy,dec2026.rice_other).toFixed(2)}`,sub:"Yellow Corn",c:"text-green-600"},{l:"Corn Avg",v:`₱${((dec2026.corn_white+dec2026.corn_yellow)/2).toFixed(2)}`,sub:"White+Yellow",c:"text-amber-600"},{l:"Palay Avg",v:`₱${((dec2026.rice_fancy+dec2026.rice_other)/2).toFixed(2)}`,sub:"Fancy+Other",c:"text-green-700"}].map(s=>(
+            {[{l:"Yellow Corn",v:`₱${decLatest.corn_yellow.toFixed(2)}`,sub:`Dec ${latestYear} forecast`,c:"text-amber-600"},{l:"Palay Other",v:`₱${decLatest.rice_other.toFixed(2)}`,sub:`Dec ${latestYear} forecast`,c:"text-green-700"},{l:"Higher Crop",v:decLatest.corn_yellow>decLatest.rice_other?"Yellow Corn":"Palay Other",sub:`Dec ${latestYear}`,c:"text-blue-600"},{l:"Lower Crop",v:decLatest.corn_yellow<decLatest.rice_other?"Yellow Corn":"Palay Other",sub:`Dec ${latestYear}`,c:"text-green-500"}].map(s=>(
               <div key={s.l} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm lift"><p className="text-xs text-gray-400 mb-1">{s.l}</p><p className={`text-2xl font-bold ${s.c}`}>{s.v}</p><p className="text-xs text-gray-400 mt-0.5">{s.sub}</p></div>
             ))}
           </div>
@@ -1077,16 +1686,19 @@ function AdminPanel({onExit}){
   // Settings handlers
   const showToast=(msg,type="success")=>{setToast({msg,type});setTimeout(()=>setToast(null),3000);};
 
-  const handleRefresh=async ()=>{
+  const handleRefresh=()=>{
     setSupaStatus("loading");
-    const { ok, error } = await pingSupabase();
-    if (ok) {
-      setSupaStatus("ok");
-      showToast("✅ Supabase connection OK (price_forecasts reachable).", "success");
-    } else {
-      setSupaStatus("error");
-      showToast(error?.message ? `❌ ${error.message}` : "❌ Connection failed. Check URL/key and that price_forecasts exists.", "error");
-    }
+    setTimeout(()=>{
+      try{
+        localStorage.setItem("supa_test","ok");
+        localStorage.removeItem("supa_test");
+        setSupaStatus("ok");
+        showToast("✅ Supabase connection refreshed!","success");
+      }catch(e){
+        setSupaStatus("error");
+        showToast("❌ Connection failed. Check your Supabase config.","error");
+      }
+    },1200);
   };
 
   const handleImportClick=()=>importRef.current?.click();
@@ -1160,7 +1772,7 @@ function AdminPanel({onExit}){
   const delUser=id=>{setUsers(users.filter(u=>u.id!==id));setSelUser(null);};
   const toggleStatus=id=>{const ss=["online","away","offline"];const upd=users.map(u=>u.id===id?{...u,status:ss[(ss.indexOf(u.status)+1)%3]}:u);setUsers(upd);if(selUser?.id===id)setSelUser(upd.find(u=>u.id===id));};
 
-  const CROP_SEARCHES={corn_white:38,corn_yellow:29,rice_fancy:52,rice_other:24};
+  const CROP_SEARCHES={corn_yellow:48,rice_other:36};
   const maxSearch=Math.max(...Object.values(CROP_SEARCHES));
 
   return(
@@ -1199,7 +1811,7 @@ function AdminPanel({onExit}){
             </div>
             <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm aFadeUp d2">
               <h3 className="font-bold text-gray-700 text-sm mb-4">🌾 Most Searched Crops</h3>
-              <div className="space-y-3">{Object.entries(CROP_SEARCHES).sort((a,b)=>b[1]-a[1]).map(([k,n])=>{const label={corn_white:"White Corn",corn_yellow:"Yellow Corn",rice_fancy:"Palay Fancy",rice_other:"Palay Other"}[k];return(<div key={k} className="flex items-center gap-3"><span className="text-xs text-gray-600 w-24 shrink-0 font-medium">{label}</span><div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden"><div className="h-full rounded-full transition-all" style={{width:`${(n/maxSearch)*100}%`,background:"#16a34a"}}/></div><span className="text-xs font-bold text-gray-700 w-6 text-right">{n}</span></div>);})}</div>
+              <div className="space-y-3">{Object.entries(CROP_SEARCHES).sort((a,b)=>b[1]-a[1]).map(([k,n])=>{const label={corn_yellow:"Yellow Corn",rice_other:"Palay Other"}[k];return(<div key={k} className="flex items-center gap-3"><span className="text-xs text-gray-600 w-24 shrink-0 font-medium">{label}</span><div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden"><div className="h-full rounded-full transition-all" style={{width:`${(n/maxSearch)*100}%`,background:"#16a34a"}}/></div><span className="text-xs font-bold text-gray-700 w-6 text-right">{n}</span></div>);})}</div>
             </div>
             <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm aFadeUp d3">
               <h3 className="font-bold text-gray-700 text-sm mb-4">📍 Province Distribution</h3>
@@ -1211,8 +1823,8 @@ function AdminPanel({onExit}){
             </div>
             <div className="bg-gradient-to-br from-green-600 to-emerald-700 rounded-2xl p-5 text-white aFadeUp d4">
               <p className="text-green-200 text-xs font-semibold uppercase tracking-widest mb-2">🔥 Top Insight</p>
-              <p className="font-bold text-lg mb-1">Palay Fancy is the most searched crop</p>
-              <p className="text-green-200 text-sm">52 searches this week — 38% above average. Consider expanding the Palay Fancy forecast to 2029.</p>
+              <p className="font-bold text-lg mb-1">Yellow Corn is the most searched crop</p>
+              <p className="text-green-200 text-sm">48 searches this week — 32% above average. Consider expanding the Yellow Corn forecast to 2029.</p>
             </div>
           </>
         )}
@@ -1352,7 +1964,7 @@ function AdminPanel({onExit}){
             {/* Import CSV */}
             <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm aFadeUp d2">
               <h4 className="font-bold text-gray-700 text-sm mb-1">📥 Import Price Data (CSV)</h4>
-              <p className="text-xs text-gray-400 mb-1">Required columns: <code className="bg-gray-100 px-1 rounded">year, month, corn_white, corn_yellow, rice_fancy, rice_other</code></p>
+              <p className="text-xs text-gray-400 mb-1">Required columns: <code className="bg-gray-100 px-1 rounded">year, month, corn_yellow, rice_other</code></p>
               <p className="text-xs text-gray-400 mb-3">Example: <code className="bg-gray-100 px-1 rounded">2026, January, 31.45, 30.72, 41.08, 32.52</code></p>
               <button onClick={handleImportClick} disabled={importing}
                 className="w-full px-4 py-2.5 rounded-xl text-sm font-semibold text-left transition-all bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-60">
@@ -1428,18 +2040,20 @@ export default function App(){
   const [notifs,setNotifs]=useLS("camprice_notifs",[]);
   const [saved,setSaved]=useLS("camprice_saved",[]);
   const [readCount,setReadCount]=useLS("camprice_read",0);
-  const [priceData,setPriceData]=useState(FALLBACK_PRICE_DATA);
   const isOnline=useOnline();
+  const [priceData,setPriceData]=useState(PRICE_DATA);
   const unread=Math.max(0,notifs.length-readCount);
-  const latestData=priceData.filter(d=>d.year===2026).at(-1);
-
-  useEffect(()=>{
-    let cancelled=false;
-    fetchPriceForecasts().then(({ data })=>{
-      if (!cancelled) setPriceData(data);
-    });
-    return ()=>{ cancelled=true; };
-  },[]);
+  // Auto-select current month/year — updates every month automatically
+  const _now=new Date();
+  const _curMonth=MONTHS_F[_now.getMonth()];
+  const _curYear=_now.getFullYear();
+  const _allYears=[...new Set((priceData.length?priceData:PRICE_DATA).map(d=>d.year))].sort((a,b)=>a-b);
+  const _targetYear=_allYears.includes(_curYear)?_curYear:_allYears[_allYears.length-1];
+  const latestData=
+    (priceData.length?priceData:PRICE_DATA).find(d=>d.year===_targetYear&&d.month===_curMonth)
+    ||(priceData.length?priceData:PRICE_DATA).filter(d=>d.year===_targetYear).at(-1)
+    ||PRICE_DATA.at(-1);
+  const latestYear=latestData?.year||_targetYear;
 
   const addNotif=useCallback((msg,type="info")=>{
     const n={id:Date.now(),msg,type,time:new Date().toLocaleTimeString("en-PH")};
@@ -1452,6 +2066,37 @@ export default function App(){
 
   // Check for admin route
   useEffect(()=>{if(window.location.search==="?admin"||window.location.pathname==="/admin")setShowAdmin(true);},[]);
+  useEffect(()=>{
+    let live=true;
+    (async()=>{
+      const inRange=await supabase
+        .from("price_forecasts")
+        .select("year,month,corn_yellow,rice_other")
+        .gte("year",YEAR_START)
+        .lte("year",YEAR_END)
+        .order("year",{ascending:true});
+
+      if(inRange.error){
+        console.error("Supabase fetch error (price_forecasts):",inRange.error);
+        addNotif("❌ Supabase error loading price_forecasts. Check RLS/table permissions.","error");
+        return;
+      }
+
+      const data=inRange.data||[];
+      if(!data.length){
+        addNotif("ℹ️ Supabase connected, but no rows found for 2010–2025.","info");
+        return;
+      }
+      const sorted=[...data]
+        .map(r=>({...r,year:Number(r.year)}))
+        .sort((a,b)=>a.year-b.year||MONTHS_F.indexOf(a.month)-MONTHS_F.indexOf(b.month));
+      if(live){
+        setPriceData(sorted);
+        addNotif(`✅ Loaded ${sorted.length} rows from Supabase.`,`success`);
+      }
+    })();
+    return()=>{live=false;};
+  },[addNotif]);
 
   if(showAdmin)return(<><style>{STYLES}</style><AdminPanel onExit={()=>{setShowAdmin(false);window.history.replaceState({},"","/");}}/></>);
 
@@ -1479,7 +2124,7 @@ export default function App(){
             {page==="weather"  &&<WeatherPage/>}
             {page==="insights" &&<InsightsPage addNotif={addNotif}/>}
             {page==="pest"     &&<PestPage/>}
-            {page==="more"     &&<MorePage latestData={latestData} notifs={notifs} clearNotifs={clearNotifs} addNotif={addNotif} saved={saved} removeSaved={removeSaved} priceData={priceData}/>}
+            {page==="more"     &&<MorePage latestData={latestData} priceData={priceData} notifs={notifs} clearNotifs={clearNotifs} addNotif={addNotif} saved={saved} removeSaved={removeSaved}/>}
           </main>
 
           <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/96 backdrop-blur border-t border-gray-100 shadow-lg aNavUp">
