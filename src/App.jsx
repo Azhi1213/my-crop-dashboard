@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "./supabaseClient";
 
 const YEAR_START = 2010;
-const YEAR_END = 2025;
+const YEAR_END = 2028;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GLOBAL STYLES
@@ -354,21 +354,57 @@ function ClockBanner(){
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CURRENT MARKET PRICES — auto-updates every month from PRICE_DATA
+// CURRENT MARKET PRICES — fetches from Supabase current_market_prices table
+// with fallback to PRICE_DATA embedded forecast data
 // ─────────────────────────────────────────────────────────────────────────────
 function MarketPrices(){
   const now = new Date();
   const curMonth = MONTHS_F[now.getMonth()];
   const curYear  = now.getFullYear();
 
-  // Find the closest available row: exact match → same year last entry → global last
+  // Live prices from Supabase current_market_prices
+  const [liveMarket,setLiveMarket]=useState(null); // {corn_yellow, rice_other, month, year} or null
+
+  useEffect(()=>{
+    (async()=>{
+      try{
+        const {data,error}=await supabase
+          .from("current_market_prices")
+          .select("variety,price,unit,grade,month,year")
+          .order("year",{ascending:false})
+          .limit(20);
+        if(error||!data?.length)return;
+        // Map rows into a single object keyed by field name
+        const obj={};
+        data.forEach(r=>{
+          const variety=(r.variety||"").trim();
+          if(variety==="Yellow Corn")obj.corn_yellow=r.price;
+          else if(variety==="Palay Other")obj.rice_other=r.price;
+          if(!obj.month)obj.month=r.month;
+          if(!obj.year)obj.year=r.year;
+        });
+        if(obj.corn_yellow||obj.rice_other)setLiveMarket(obj);
+      }catch(e){/* silently fall back */}
+    })();
+  },[]);
+
+  // Fallback: find the closest row in embedded PRICE_DATA
   const allYears = [...new Set(PRICE_DATA.map(d=>d.year))].sort((a,b)=>a-b);
   const targetYear = allYears.includes(curYear) ? curYear : allYears[allYears.length-1];
-  const row = PRICE_DATA.find(d=>d.year===targetYear && d.month===curMonth)
+  const fallbackRow = PRICE_DATA.find(d=>d.year===targetYear && d.month===curMonth)
            || PRICE_DATA.filter(d=>d.year===targetYear).at(-1)
            || PRICE_DATA.at(-1);
 
-  // Previous month row for MoM change
+  // Use live data if available, otherwise fallback
+  const usingLive = liveMarket!=null;
+  const row = usingLive
+    ? {corn_yellow:liveMarket.corn_yellow??fallbackRow.corn_yellow,
+       rice_other:liveMarket.rice_other??fallbackRow.rice_other,
+       month:liveMarket.month||curMonth,
+       year:liveMarket.year||curYear}
+    : fallbackRow;
+
+  // Previous month row for MoM change (from embedded data only)
   const rowIdx = PRICE_DATA.findIndex(d=>d.year===row.year && d.month===row.month);
   const prevRow = rowIdx > 0 ? PRICE_DATA[rowIdx-1] : null;
 
@@ -521,7 +557,7 @@ function HomePage({latestData,priceData}){
       </div>
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm lift aFadeUp d5">
         <h3 className="font-bold text-gray-700 text-sm mb-2 flex items-center gap-2">📊 About This Dashboard</h3>
-        <p className="text-xs text-gray-500 leading-relaxed">AI-generated price forecasts for key agricultural commodities in <strong>Camarines Sur</strong>. Derived from SARIMA time series analysis of DA-5 historical data 2005–2025. Use <strong>Prices</strong> for monthly charts, <strong>Weather</strong> for climate impact, <strong>Insights</strong> for AI explanations, <strong>Pest</strong> for disease detection, and <strong>More</strong> for location suggestions, notifications, and history.</p>
+        <p className="text-xs text-gray-500 leading-relaxed">AI-generated price forecasts for key agricultural commodities in <strong>Camarines Sur</strong>. Derived from SARIMA time series analysis of DA-5 historical data 2010–2025, with forecasts through 2028. Use <strong>Prices</strong> for monthly charts, <strong>Weather</strong> for climate impact, <strong>Insights</strong> for AI explanations, <strong>Pest</strong> for disease detection, and <strong>More</strong> for location suggestions, notifications, and history.</p>
       </div>
     </div>
   );
@@ -530,7 +566,8 @@ function HomePage({latestData,priceData}){
 // ── PRICE BROWSE CARD ── shows one month at a time with arrow navigation
 function PriceBrowseCards({priceData,onSelect,selVar}){
   // Build flat list of all months across all years in PRICE_DATA
-  const allRows=PRICE_DATA; // always use forecast data for browsing
+  // Use priceData (Supabase) for browsing; fallback to embedded PRICE_DATA
+  const allRows=(priceData&&priceData.length?priceData:PRICE_DATA).filter(r=>r.corn_yellow!=null&&r.rice_other!=null);
   const [idx,setIdx]=useState(()=>{
     const now=new Date();
     const m=MONTHS_F[now.getMonth()];
@@ -1142,7 +1179,7 @@ function InsightsPage({addNotif}){
           {/* Data source note */}
           <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
             <h3 className="font-bold text-gray-700 text-sm mb-2">📂 Data Source</h3>
-            <p className="text-xs text-gray-500 leading-relaxed">Historical farmgate prices sourced from <strong>DA-RFO 5 AMAD</strong> (Agricultural Marketing and Agribusiness Development) covering Camarines Sur, 2010–2025. Monthly observations (15th of month) for Yellow Corn and Palay Other Variety. Training window: <strong>15 years × 12 months = 180 data points per crop.</strong></p>
+            <p className="text-xs text-gray-500 leading-relaxed">Historical farmgate prices sourced from <strong>DA-RFO 5 AMAD</strong> (Agricultural Marketing and Agribusiness Development) covering Camarines Sur, 2010–2025. Monthly observations (15th of month) for Yellow Corn and Palay Other Variety. Training window: <strong>15 years (2010–2025) × 12 months = 180 data points per crop. Forecasts extend to 2028.</strong></p>
             <div className="mt-3 grid grid-cols-2 gap-2">
               <div className="bg-white rounded-xl p-2.5 text-center border border-gray-100">
                 <p className="text-lg font-bold text-gray-800">180</p>
@@ -1617,7 +1654,7 @@ function MorePage({latestData,priceData,notifs,clearNotifs,addNotif,saved,remove
           <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
             <h3 className="font-bold text-gray-700 text-sm mb-3">🌐 Offline Capabilities</h3>
             <div className="space-y-2">
-              {[["✅","Price forecast data (2026–2028)","Always available — data is embedded in the app"],["✅","Weather seasonal averages","Available offline — historical data embedded"],["✅","AI Insights & crop calendar","Available offline — no internet needed"],["✅","Saved results / history","Stored locally on your device"],["✅","Pest & disease reference","All 6 diseases available without internet"],["⚠️","Current market prices","Requires internet for live DA-5 AMAD data"],["⚠️","Auto-detect location","Requires GPS & internet for best accuracy"]].map(([s,f,d])=>(
+              {[["✅","Price forecast data (2010–2028)","Always available — data is embedded in the app"],["✅","Weather seasonal averages","Available offline — historical data embedded"],["✅","AI Insights & crop calendar","Available offline — no internet needed"],["✅","Saved results / history","Stored locally on your device"],["✅","Pest & disease reference","All 6 diseases available without internet"],["⚠️","Current market prices","Requires internet for live DA-5 AMAD data"],["⚠️","Auto-detect location","Requires GPS & internet for best accuracy"]].map(([s,f,d])=>(
                 <div key={f} className="flex gap-3 bg-gray-50 rounded-xl p-3"><span className="text-base mt-0.5">{s}</span><div><p className="text-xs font-semibold text-gray-700">{f}</p><p className="text-xs text-gray-400">{d}</p></div></div>
               ))}
             </div>
@@ -1625,7 +1662,7 @@ function MorePage({latestData,priceData,notifs,clearNotifs,addNotif,saved,remove
           <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
             <h3 className="font-bold text-gray-700 text-sm mb-2">💾 Cache Status</h3>
             <div className="space-y-2">
-              {[["Price Data","36 months cached","✅"],["Weather Data","12 months cached","✅"],["Disease Guide","6 diseases cached","✅"]].map(([l,d,s])=><div key={l} className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2"><div><p className="text-xs font-semibold text-gray-700">{l}</p><p className="text-xs text-gray-400">{d}</p></div><span>{s}</span></div>)}
+              {[["Price Data","2010–2028 cached (228 months)","✅"],["Weather Data","12 months cached","✅"],["Disease Guide","6 diseases cached","✅"]].map(([l,d,s])=><div key={l} className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2"><div><p className="text-xs font-semibold text-gray-700">{l}</p><p className="text-xs text-gray-400">{d}</p></div><span>{s}</span></div>)}
             </div>
           </div>
           <div className="bg-blue-50 rounded-2xl border border-blue-100 p-4"><p className="text-xs text-blue-700"><span className="font-semibold">💡 Tip for Farmers:</span> All price forecasts, AI insights, and the disease guide work without any internet connection — ideal for remote areas in Camarines Sur with limited data signal.</p></div>
@@ -2069,30 +2106,44 @@ export default function App(){
   useEffect(()=>{
     let live=true;
     (async()=>{
-      const inRange=await supabase
-        .from("price_forecasts")
-        .select("year,month,corn_yellow,rice_other")
+      // Fetch from historical_prices — rows are per-variety, pivoted into
+      // {year, month, corn_yellow, rice_other} shape the rest of the app uses
+      const {data,error}=await supabase
+        .from("historical_prices")
+        .select("variety,year,month,price")
         .gte("year",YEAR_START)
         .lte("year",YEAR_END)
         .order("year",{ascending:true});
 
-      if(inRange.error){
-        console.error("Supabase fetch error (price_forecasts):",inRange.error);
-        addNotif("❌ Supabase error loading price_forecasts. Check RLS/table permissions.","error");
+      if(error){
+        console.error("Supabase fetch error (historical_prices):",error);
+        addNotif("❌ Supabase error loading historical_prices. Check RLS/table permissions.","error");
         return;
       }
 
-      const data=inRange.data||[];
-      if(!data.length){
-        addNotif("ℹ️ Supabase connected, but no rows found for 2010–2025.","info");
+      const rows=data||[];
+      if(!rows.length){
+        addNotif("ℹ️ Supabase connected, but no rows found in historical_prices.","info");
         return;
       }
-      const sorted=[...data]
-        .map(r=>({...r,year:Number(r.year)}))
+
+      // Pivot: group by year+month, map variety name to field key
+      const map={};
+      rows.forEach(r=>{
+        const key=`${r.year}__${r.month}`;
+        if(!map[key])map[key]={year:Number(r.year),month:r.month};
+        const variety=(r.variety||"").trim();
+        if(variety==="Corn Yellow"||variety==="corn_yellow")map[key].corn_yellow=r.price;
+        else if(variety==="Palay Other"||variety==="rice_other")map[key].rice_other=r.price;
+      });
+
+      const sorted=Object.values(map)
+        .filter(r=>r.corn_yellow!=null||r.rice_other!=null)
         .sort((a,b)=>a.year-b.year||MONTHS_F.indexOf(a.month)-MONTHS_F.indexOf(b.month));
+
       if(live){
         setPriceData(sorted);
-        addNotif(`✅ Loaded ${sorted.length} rows from Supabase.`,`success`);
+        addNotif(`✅ Loaded ${sorted.length} rows from Supabase (${YEAR_START}–${YEAR_END}).`,"success");
       }
     })();
     return()=>{live=false;};
