@@ -70,7 +70,7 @@ const PRICE_DATA = [
   {year:2026,month:"January",   corn_white:17.392251,corn_yellow:16.813207,rice_fancy:18.712211,rice_other:17.763376},
   {year:2026,month:"February",  corn_white:18.365217,corn_yellow:17.855983,rice_fancy:19.335521,rice_other:18.322656},
   {year:2026,month:"March",     corn_white:19.12896,corn_yellow:18.367113,rice_fancy:20.065234,rice_other:18.810585},
-  {year:2026,month:"April",     corn_white:19.505476,corn_yellow:18.759517,rice_fancy:20.360768,rice_other:19.281987},
+  {year:2026,month:"April",     corn_white:19.505476,corn_yellow:20,rice_fancy:20.360768,rice_other:28},
   {year:2026,month:"May",       corn_white:18.630631,corn_yellow:18.054585,rice_fancy:20.199005,rice_other:19.02364},
   {year:2026,month:"June",      corn_white:17.766734,corn_yellow:17.183269,rice_fancy:20.115631,rice_other:18.933412},
   {year:2026,month:"July",      corn_white:16.408729,corn_yellow:16.156589,rice_fancy:19.617338,rice_other:18.520088},
@@ -105,11 +105,11 @@ const PRICE_DATA = [
   {year:2028,month:"December",  corn_white:16.494218,corn_yellow:16.118313,rice_fancy:19.289481,rice_other:18.286411}
 ];
 
-// Actual market prices from dataset (May 2025 — DA-5 AMAD / Excel source)
-// Actual market prices from Excel dataset (May 2025)
+// Actual market prices from dataset (2026 — DA-5 AMAD / Excel source)
+// Actual market prices from Excel dataset (2026)
 const MARKET = [
-  {label:"Yellow Corn",icon:"🌽",cat:"Corn",  price:14.25,unit:"farmgate",chg:-0.12},
-  {label:"Palay Other",icon:"🌾",cat:"Palay", price:14.43,unit:"fresh/wet",chg:-0.08},
+  {label:"Yellow Corn",icon:"🌽",cat:"Corn",  price:20,unit:"farmgate",chg:-0.12},
+  {label:"Palay Other",icon:"🌾",cat:"Palay", price:28,unit:"fresh/wet",chg:-0.08},
 ];
 
 const CROPS = {
