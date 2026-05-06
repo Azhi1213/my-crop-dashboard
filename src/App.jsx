@@ -268,13 +268,14 @@ function LineChart({data,color,label,height=160}){
 }
 
 // Bar chart
-function BarChart({data,color,labels,height=100}){
+function BarChart({data,color,labels,height=100,showValues=false}){
   if(!data)return null;
   const max=Math.max(...data);
   return(
-    <div className="flex items-end gap-1" style={{height}}>
+    <div className="flex items-end gap-1" style={{height:showValues?height+18:height}}>
       {data.map((v,i)=>(
         <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+          {showValues&&<span className="font-semibold" style={{fontSize:7,color}}>{v}</span>}
           <div className="w-full rounded-t-sm" style={{height:`${(v/max)*(height-16)}px`,background:color,opacity:.65+(v/max)*.35}}/>
           {labels&&<span className="text-gray-400" style={{fontSize:8}}>{labels[i]}</span>}
         </div>
@@ -707,7 +708,7 @@ function PricesPage({addNotif,saveResult,priceData}){
                 <p className="text-xs text-gray-500 mt-0.5">Monthly price predictions · ₱/kg · Camarines Sur</p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                {YEARS.map(yr=>(
+                {YEARS.filter(yr=>yr>=2026).map(yr=>(
                   <button key={yr} onClick={()=>setSelYear(yr)}
                     className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all
                       ${selYear===yr?`${ac.accent} text-white shadow`:"bg-white text-gray-500 border border-gray-200 hover:border-gray-300"}`}>
@@ -743,8 +744,8 @@ function PricesPage({addNotif,saveResult,priceData}){
             {chartTab==="demand"&&(
               <>
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Monthly Demand Index — {selVar.label}</p>
-                <BarChart data={DEMAND[selVar.key]} color={ac.color} labels={MONTHS_S} height={100}/>
-                <p className="text-xs text-gray-400 mt-2 text-center">Index 0–100 based on historical consumption patterns</p>
+                <BarChart data={DEMAND[selVar.key]} color={ac.color} labels={MONTHS_S} height={100} showValues/>
+                <p className="text-xs text-gray-400 mt-2 text-center">Based on historical consumption patterns</p>
               </>
             )}
 
@@ -939,7 +940,7 @@ function InsightsPage({addNotif}){
 
       {/* ── Tab nav ── */}
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {[["overview","🌟 Overview"],["forecast","📊 Forecast"],["methodology","⚙️ Methodology"],["factors","🔍 Factors"],["calendar","📅 Calendar"]].map(([k,l])=>(
+        {[["overview","🌟 Overview"],["forecast","📊 Forecast"],["methodology","⚙️ Methodology"],["calendar","📅 Calendar"]].map(([k,l])=>(
           <button key={k} onClick={()=>setInsightTab(k)}
             className={`px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${insightTab===k?"tab-pill-active":"tab-pill-idle"}`}>
             {l}
@@ -985,12 +986,12 @@ function InsightsPage({addNotif}){
                     <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
                       <div className="h-full rounded-full transition-all duration-700" style={{width:`${val}%`,background:c.color}}/>
                     </div>
-                    <span className={`text-xs font-bold w-8 ${c.text}`}>{val}</span>
+                    <span className={`text-xs font-bold shrink-0 ${c.text}`}>{val}<span className="text-gray-400 font-normal">/100</span></span>
                   </div>
                 );
               })}
             </div>
-            <p className="text-xs text-gray-400 mt-2">Demand index 0–100 scale based on historical consumption patterns</p>
+            <p className="text-xs text-gray-400 mt-2">Demand Score (0–100 index) — not peso or percent. Higher score = stronger demand.</p>
           </div>
 
           {/* Quick 2026 snapshot */}
@@ -1189,39 +1190,6 @@ function InsightsPage({addNotif}){
                 <p className="text-lg font-bold text-gray-800">36</p>
                 <p className="text-xs text-gray-400">Months forecasted</p>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ══════════════════ FACTORS TAB ══════════════════ */}
-      {insightTab==="factors"&&(
-        <div className="space-y-4 aFadeUp">
-          <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-            <h3 className="font-bold text-gray-700 text-sm mb-3">🔍 Price Influence Factors</h3>
-            <div className="flex gap-2 mb-4">
-              {Object.entries(keyMap2).map(([k,info])=>{
-                const c=CROPS[info.crop];
-                return <button key={k} onClick={()=>setSelKey(k)} className={`flex-1 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${selKey===k?`${c.accent} text-white`:`${c.badge}`}`}>{c.icon} {info.label}</button>;
-              })}
-            </div>
-            <div className="grid grid-cols-2 gap-2 mb-4">
-              <div className="bg-amber-50 rounded-xl p-3"><p className="text-xs text-amber-600 font-semibold">🌱 Ideal Soil pH</p><p className="text-lg font-bold text-amber-700">{SOIL_PH[selKey]}</p></div>
-              <div className="bg-blue-50 rounded-xl p-3"><p className="text-xs text-blue-600 font-semibold">🌧️ Rainfall Needed</p><p className="text-sm font-bold text-blue-700">{RAINFALL_NEEDS[selKey]}</p></div>
-            </div>
-            <div className="space-y-2">
-              {factors.map((f,i)=>(
-                <div key={i} className="bg-gray-50 rounded-xl p-3 aSlideL" style={{animationDelay:`${i*.07}s`}}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold text-gray-700">{f.f}</span>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${f.imp==="High"?"bg-red-100 text-red-700":f.imp==="Medium"?"bg-amber-100 text-amber-700":"bg-green-100 text-green-700"}`}>{f.imp}</span>
-                      <span className={`text-sm font-bold ${f.dir==="↑"?"text-red-500":"text-green-600"}`}>{f.dir}</span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500">{f.desc}</p>
-                </div>
-              ))}
             </div>
           </div>
         </div>
