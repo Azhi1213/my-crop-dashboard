@@ -158,9 +158,19 @@ const FACTORS = {
   ],
 };
 
-const DEMAND = {
-  corn_yellow:[70,68,65,67,72,70,69,71,74,76,78,80],
-  rice_other: [75,72,70,73,75,74,73,75,76,78,80,82],
+const DEMAND_BY_YEAR = {
+  2026:{
+    corn_yellow:[70,68,65,67,72,70,69,71,74,76,78,80],
+    rice_other: [75,72,70,73,75,74,73,75,76,78,80,82],
+  },
+  2027:{
+    corn_yellow:[72,70,67,69,74,72,71,73,76,78,80,83],
+    rice_other: [77,74,72,75,77,76,75,77,78,80,82,84],
+  },
+  2028:{
+    corn_yellow:[74,72,69,71,76,74,73,75,78,80,82,85],
+    rice_other: [79,76,74,77,79,78,77,79,80,82,84,86],
+  },
 };
 
 const SOIL_PH = {corn_yellow:6.2,rice_other:5.5};
@@ -275,7 +285,7 @@ function BarChart({data,color,labels,height=100,showValues=false}){
     <div className="flex items-end gap-1" style={{height:showValues?height+18:height}}>
       {data.map((v,i)=>(
         <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
-          {showValues&&<span className="font-semibold" style={{fontSize:7,color}}>{v}</span>}
+          {showValues&&<span className="font-semibold" style={{fontSize:7,color}}>{v}<span style={{fontSize:6,opacity:.7}}>%</span></span>}
           <div className="w-full rounded-t-sm" style={{height:`${(v/max)*(height-16)}px`,background:color,opacity:.65+(v/max)*.35}}/>
           {labels&&<span className="text-gray-400" style={{fontSize:8}}>{labels[i]}</span>}
         </div>
@@ -743,9 +753,9 @@ function PricesPage({addNotif,saveResult,priceData}){
 
             {chartTab==="demand"&&(
               <>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Monthly Demand Index — {selVar.label}</p>
-                <BarChart data={DEMAND[selVar.key]} color={ac.color} labels={MONTHS_S} height={100} showValues/>
-                <p className="text-xs text-gray-400 mt-2 text-center">Based on historical consumption patterns</p>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Monthly Demand Index — {selVar.label} · {selYear}</p>
+                <BarChart data={(DEMAND_BY_YEAR[selYear]||DEMAND_BY_YEAR[2026])[selVar.key]} color={ac.color} labels={MONTHS_S} height={100} showValues/>
+                <p className="text-xs text-gray-400 mt-2 text-center">Demand Score (0–100%) — relative demand strength per month, not peso or absolute percent.</p>
               </>
             )}
 
@@ -979,19 +989,19 @@ function InsightsPage({addNotif}){
             <div className="space-y-3">
               {Object.entries(keyMap2).map(([k,info])=>{
                 const c=CROPS[info.crop];
-                const val=DEMAND[k][monthIdx];
+                const val=(DEMAND_BY_YEAR[2026])[k][monthIdx];
                 return(
                   <div key={k} className="flex items-center gap-3">
                     <span className="text-xs text-gray-600 font-medium w-24 shrink-0">{info.label}</span>
                     <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
                       <div className="h-full rounded-full transition-all duration-700" style={{width:`${val}%`,background:c.color}}/>
                     </div>
-                    <span className={`text-xs font-bold shrink-0 ${c.text}`}>{val}<span className="text-gray-400 font-normal">/100</span></span>
+                    <span className={`text-xs font-bold shrink-0 ${c.text}`}>{val}<span className="text-gray-400 font-normal">%</span></span>
                   </div>
                 );
               })}
             </div>
-            <p className="text-xs text-gray-400 mt-2">Demand Score (0–100 index) — not peso or percent. Higher score = stronger demand.</p>
+            <p className="text-xs text-gray-400 mt-2">Demand Score (0–100%) — relative demand strength, not peso or absolute percent.</p>
           </div>
 
           {/* Quick 2026 snapshot */}
